@@ -1,0 +1,8 @@
+ipykernel
+matplotlib
+numpy
+scikit-learn
+scipy
+seaborn
+h5py
+opencv-python
