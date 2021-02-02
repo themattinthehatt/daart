@@ -1,8 +1,9 @@
+h5py
 ipykernel
 matplotlib
 numpy
+opencv-python
 scikit-learn
 scipy
 seaborn
-h5py
-opencv-python
+torch==1.3.1
