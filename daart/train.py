@@ -4,7 +4,6 @@ import copy
 import os
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import torch
 
 # to ignore imports for sphix-autoapidoc
@@ -29,7 +28,11 @@ class Logger(object):
             absolute path to directory where logged values are saved
 
         """
-        self.save_path = save_path
+        if save_path is not None:
+            self.save_file = os.path.join(save_path, 'metrics.csv')
+        else:
+            self.save_file = None
+
         self.metrics = {}
         self.n_datasets = n_datasets
         dtype_strs = ['train', 'val', 'test', 'curr']
@@ -161,10 +164,10 @@ class Logger(object):
 
         self.all_metrics_list.append(metric_row)
 
-        if self.save_path is not None:
+        if self.save_file is not None:
             # save the metrics data
             df = pd.DataFrame(self.all_metrics_list)
-            df.to_csv(self.save_path, index=False)
+            df.to_csv(self.save_file, index=False)
 
         return metric_row
 

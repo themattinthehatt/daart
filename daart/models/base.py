@@ -1,7 +1,12 @@
 """Base models/modules in PyTorch."""
 
 import math
-from torch import nn, save, Tensor
+import numpy as np
+import os
+import pickle
+import torch
+from torch import nn, optim, save, Tensor
+from tqdm import tqdm
 
 from daart.train import EarlyStopping, Logger
 
@@ -68,7 +73,7 @@ class BaseModel(nn.Module):
         """Get all model parameters that have gradient updates turned on."""
         return filter(lambda p: p.requires_grad, self.parameters())
 
-    def train(self, data_generator, save_path=None, **kwargs):
+    def fit(self, data_generator, save_path=None, **kwargs):
         """Fit pytorch models with stochastic gradient descent and early stopping.
 
         Training parameters such as min epochs, max epochs, and early stopping hyperparameters are
@@ -155,9 +160,9 @@ class BaseModel(nn.Module):
         # early stopping setup
         if get_param('enable_early_stop', False):
             early_stop = EarlyStopping(patience=patience, min_epochs=min_epochs)
-            self.hparams['enable_early_stop'] = True
         else:
             early_stop = None
+        self.hparams['enable_early_stop'] = True
 
         # enumerate batches on which validation metrics should be recorded
         best_val_loss = np.inf
@@ -266,7 +271,7 @@ class BaseModel(nn.Module):
             # ---------------------------------------
             # check for early stopping
             # ---------------------------------------
-            if enable_early_stop:
+            if early_stop is not None:
                 early_stop.on_val_check(i_epoch, logger.get_loss('val'))
                 if early_stop.should_stop:
                     break
@@ -306,6 +311,11 @@ class BaseModel(nn.Module):
             logger.create_metric_row(
                 'test', i_epoch, i_test, dataset, trial=data['batch_idx'].item(),
                 by_dataset=True)
+
+        # save out hparams
+        if save_path is not None:
+            with open(os.path.join(save_path, 'hparams.pkl'), 'wb') as f:
+                pickle.dump(self.hparams, f)
 
 
 def print_epoch(curr, total):

@@ -1,6 +1,7 @@
 """Supervised models implemented in PyTorch."""
 
 import numpy as np
+from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
 from daart.models.base import BaseModule, BaseModel
@@ -115,8 +116,8 @@ class TemporalMLP(BaseModel):
 
     def __str__(self):
         """Pretty print model architecture."""
-        format_str = '\nNN architecture\n'
-        format_str += '---------------\n'
+        format_str = '\nTemporalMLP architecture\n'
+        format_str += '------------------------\n'
         for i, module in enumerate(self.decoder):
             format_str += str('    {}: {}\n'.format(i, module))
         return format_str

@@ -96,12 +96,17 @@ def compute_batches(data, batch_size):
         # assume data has already been batched
         return data
 
+    if len(data.shape) == 2:
+        batch_dims = (batch_size, data.shape[1])
+    else:
+        batch_dims = (batch_size,)
+
     n_batches = int(np.floor(data.shape[0] / batch_size))
-    batched_data = [np.nan * np.zeros(batch_size, data.shape[0])]
+    batched_data = [np.nan * np.zeros(batch_dims) for _ in range(n_batches)]
     for b in range(n_batches):
         idx_beg = b * batch_size
         idx_end = (b + 1) * batch_size
-        batched_data[b] = data[idx_beg:idx_end, :]
+        batched_data[b] = data[idx_beg:idx_end]
     return batched_data
 
 
@@ -149,7 +154,7 @@ class SingleDataset(data.Dataset):
             self.dtypes[signal] = None  # update when loading data
 
         self.load_data(batch_size)
-        self.n_trials = len(data[signals[0]])
+        self.n_trials = len(self.data[signals[0]])
 
         # meta data about train/test/xv splits; set by DataGenerator
         self.batch_idxs = None
@@ -225,14 +230,14 @@ class SingleDataset(data.Dataset):
             if signal == 'markers':
 
                 # assume dlc format
-                file_ext = self.paths['signal'].split('.')[-3:]
+                file_ext = self.paths[signal].split('.')[-1]
                 if file_ext == 'csv':
                     from numpy import genfromtxt
                     dlc = genfromtxt(
-                        self.paths['signal'], delimiter=',', dtype=None, encoding=None)
+                        self.paths[signal], delimiter=',', dtype=None, encoding=None)
                     dlc = dlc[3:, 1:].astype('float')  # get rid of headers, etc.
                 elif file_ext == 'h5':
-                    with h5py.File(self.paths['signal'], 'r') as f:
+                    with h5py.File(self.paths[signal], 'r') as f:
                         t = f['df_with_missing']['table'][()]
                     dlc = np.concatenate([t[i][1][None, :] for i in range(len(t))])
                 else:
@@ -241,18 +246,21 @@ class SingleDataset(data.Dataset):
                 y = dlc[:, 1::3]
                 data_curr = np.hstack([x, y])
                 # l = dlc[:, 2::3]
+                self.dtypes[signal] = 'float32'
 
             elif signal == 'labels':
 
                 # assume particular pkl format
-                with open(self.paths['signal'], 'rb') as f:
+                with open(self.paths[signal], 'rb') as f:
                     data_curr = pickle.load(f)['states']
+                self.dtypes[signal] = 'int32'
 
             elif signal == 'soft_labels':
 
                 # assume particular pkl format
-                with open(self.paths['signal'], 'rb') as f:
+                with open(self.paths[signal], 'rb') as f:
                     data_curr = pickle.load(f)['states']
+                self.dtypes[signal] = 'int32'
 
             else:
                 raise ValueError('"%s" is an invalid signal type' % signal)
