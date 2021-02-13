@@ -61,6 +61,48 @@ class HardSegmenter(BaseModel):
         """Process input data."""
         return self.model(x)
 
+    def predict_labels(self, data_generator):
+        """
+
+        Parameters
+        ----------
+        data_generator : ConcatSessionsGenerator object
+            data generator to serve data batches
+
+        Returns
+        -------
+        dict
+            - 'predictions' (list of lists): first list is over datasets; second list is over
+              batches in the dataset; each element is a numpy array of the label probability
+              distribution
+            - 'weak_labels' (list of lists): corresponding weak labels
+            - 'labels' (list of lists): corresponding labels
+
+        """
+        self.eval()
+
+        softmax = nn.Softmax(dim=1)
+
+        # initialize container for latents
+        labels = [[] for _ in range(data_generator.n_datasets)]
+        for sess, dataset in enumerate(data_generator.datasets):
+            labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+
+        # partially fill container (gap trials will be included as nans)
+        dtypes = ['train', 'val', 'test']
+        for dtype in dtypes:
+            data_generator.reset_iterators(dtype)
+            for i in range(data_generator.n_tot_batches[dtype]):
+                data, sess = data_generator.next_batch(dtype)
+                predictors = data['markers'][0]
+                # targets = data['labels'][0]
+                outputs_dict = self.model(predictors)
+                # push through log-softmax, since this is included in the loss and not model
+                labels[sess][data['batch_idx'].item()] = \
+                    softmax(outputs_dict['labels']).cpu().detach().numpy()
+
+        return {'predictions': labels, 'weak_labels': None, 'labels': None}
+
     def loss(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.
 
@@ -87,10 +129,10 @@ class HardSegmenter(BaseModel):
         targets = data['labels'][0]
 
         # push data through model
-        outputs = self.model(predictors)
+        outputs_dict = self.model(predictors)
 
         # compute loss on allowed window of data
-        loss = self._loss(outputs, targets)
+        loss = self._loss(outputs_dict['labels'], targets)
 
         if accumulate_grad:
             loss.backward()
@@ -98,7 +140,7 @@ class HardSegmenter(BaseModel):
         # get loss value (weighted by batch size)
         loss_val = loss.item()
 
-        outputs_val = outputs.cpu().detach().numpy()
+        outputs_val = outputs_dict['labels'].cpu().detach().numpy()
 
         fc = accuracy_score(targets.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
 
@@ -225,8 +267,8 @@ class TemporalMLP(BaseModel):
 
         Returns
         -------
-        torch.Tensor
-            mean prediction of model
+        dict
+            - 'labels' (torch.Tensor): prediction of model
 
         """
         for name, layer in self.decoder.named_children():
@@ -234,11 +276,19 @@ class TemporalMLP(BaseModel):
             if name == 'conv1d_layer_00':
                 # input is batch x in_channels x time
                 # output is batch x out_channels x time
+
+                # x = T x N (T = 500, N = 16)
+                # x.transpose(1, 0) -> x = N x T
+                # x.unsqueeze(0) -> x = 1 x N x T
+                # x = layer(x) -> x = 1 x M x T
+                # x.squeeze() -> x = M x T
+                # x.transpose(1, 0) -> x = T x M
+
                 x = layer(x.transpose(1, 0).unsqueeze(0)).squeeze().transpose(1, 0)
             else:
                 x = layer(x)
 
-        return x
+        return {'labels': x}
 
 
 class TemporalConv(BaseModel):
