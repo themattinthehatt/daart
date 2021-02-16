@@ -128,11 +128,14 @@ def find_experiment(hparams):
     """
 
     # fill out path info if not present
-    if 'model_dir' not in hparams:
-        if 'expt_dir' not in hparams:
-            hparams['expt_dir'] = get_expt_dir(hparams['results_dir'], hparams['expt_ids'])
-        hparams['model_dir'] = get_model_dir(hparams['expt_dir'], hparams)
-    tt_expt_dir = os.path.join(hparams['model_dir'], hparams['tt_experiment_name'])
+    if 'tt_expt_dir' in hparams:
+        tt_expt_dir = hparams['tt_expt_dir']
+    else:
+        if 'model_dir' not in hparams:
+            if 'expt_dir' not in hparams:
+                hparams['expt_dir'] = get_expt_dir(hparams['results_dir'], hparams['expt_ids'])
+            hparams['model_dir'] = get_model_dir(hparams['expt_dir'], hparams)
+        tt_expt_dir = os.path.join(hparams['model_dir'], hparams['tt_experiment_name'])
 
     try:
         tt_versions = get_subdirs(tt_expt_dir)

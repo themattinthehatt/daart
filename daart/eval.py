@@ -43,15 +43,14 @@ def get_precision_recall(true_classes, pred_classes, background=0):
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
 
     # chop off background class if it exists
-    stats = {
-        'precision': precision if len(precision) == n_classes else precision[1:],
-        'recall': recall if len(recall) == n_classes else recall[1:]}
-
-    return stats
+    p = precision if len(precision) == n_classes else precision[1:]
+    r = recall if len(recall) == n_classes else recall[1:]
+    f1 = 2 * p * r / (p + r)
+    return {'precision': p, 'recall': r, 'f1': f1}
 
 
 def plot_training_curves(
-        metrics_file, dtype='val', dataset_ids=None, save_file=None, format='pdf'):
+        metrics_file, dtype='val', expt_ids=None, save_file=None, format='pdf'):
     """Create training plots for each term in the objective function.
 
     The `dtype` argument controls which type of trials are plotted ('train' or 'val').
@@ -75,7 +74,7 @@ def plot_training_curves(
         csv file saved during training
     dtype : str
         'train' | 'val'
-    dataset_ids : list, optional
+    expt_ids : list, optional
         dataset names for easier parsing
     save_file : str, optional
         absolute path of save file; does not need file extension
@@ -87,15 +86,20 @@ def plot_training_curves(
     metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'fc']
 
     metrics_dfs = []
-    metrics_dfs.append(load_metrics_csv_as_df(metrics_file, metrics_list, dataset_ids=dataset_ids))
+    metrics_dfs.append(load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids))
     metrics_df = pd.concat(metrics_dfs, sort=False)
+
+    if isinstance(expt_ids, list) and len(expt_ids) > 1:
+        hue = 'dataset'
+    else:
+        hue = None
 
     sns.set_style('white')
     sns.set_context('talk')
     data_queried = metrics_df[
         (metrics_df.epoch > 10) & ~pd.isna(metrics_df.val) & (metrics_df.dtype == dtype)]
     g = sns.FacetGrid(
-        data_queried, col='loss', col_wrap=2, hue=None, sharey=False, height=4)
+        data_queried, col='loss', col_wrap=2, hue=hue, sharey=False, height=4)
     g = g.map(plt.plot, 'epoch', 'val').add_legend()
 
     if save_file is not None:
@@ -103,7 +107,7 @@ def plot_training_curves(
         g.savefig(save_file + '.' + format, dpi=300, format=format)
 
 
-def load_metrics_csv_as_df(metric_file, metrics_list, dataset_ids=None, test=False):
+def load_metrics_csv_as_df(metric_file, metrics_list, expt_ids=None, test=False):
     """Load metrics csv file and return as a pandas dataframe for easy plotting.
 
     Parameters
@@ -112,7 +116,7 @@ def load_metrics_csv_as_df(metric_file, metrics_list, dataset_ids=None, test=Fal
         csv file saved during training
     metrics_list : list
         names of metrics to pull from csv; do not prepend with 'tr', 'val', or 'test'
-    dataset_ids : list, optional
+    expt_ids : list, optional
         dataset names for easier parsing
     test : bool
         True to only return test values (computed once at end of training)
@@ -131,8 +135,8 @@ def load_metrics_csv_as_df(metric_file, metrics_list, dataset_ids=None, test=Fal
 
         if row['dataset'] == -1:
             dataset = 'all'
-        elif dataset_ids is not None:
-            dataset = dataset_ids[row['dataset']]
+        elif expt_ids is not None:
+            dataset = expt_ids[int(row['dataset'])]
         else:
             dataset = row['dataset']
 
