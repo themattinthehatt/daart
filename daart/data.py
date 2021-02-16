@@ -68,21 +68,21 @@ def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0
             (n_trials, train_tr, val_tr, test_tr, gap_tr))
 
     leftover_trials = n_trials - tr_per_block * n_blocks
-    if leftover_trials > 0:
-        offset = np.random.randint(0, high=leftover_trials)
-    else:
-        offset = 0
     idxs_block = np.random.permutation(n_blocks)
 
     batch_idxs = {'train': [], 'test': [], 'val': []}
     for block in idxs_block:
 
-        curr_tr = block * tr_per_block + offset
+        curr_tr = block * tr_per_block
         batch_idxs['train'].append(np.arange(curr_tr, curr_tr + train_tr))
         curr_tr += (train_tr + gap_tr)
         batch_idxs['val'].append(np.arange(curr_tr, curr_tr + val_tr))
         curr_tr += (val_tr + gap_tr)
         batch_idxs['test'].append(np.arange(curr_tr, curr_tr + test_tr))
+
+    # add leftover trials to train data
+    if leftover_trials > 0:
+        batch_idxs['train'].append(np.arange(tr_per_block * n_blocks, n_trials))
 
     for dtype in ['train', 'val', 'test']:
         batch_idxs[dtype] = np.concatenate(batch_idxs[dtype], axis=0)
