@@ -35,13 +35,19 @@ def get_precision_recall(true_classes, pred_classes, background=0):
 
     # find all data points that are not background
     obs_idxs = np.where(true_classes != background)[0]
+    n_classes = len(np.unique(true_classes[obs_idxs]))
 
     precision = precision_score(
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
     recall = recall_score(
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
 
-    return {'precision': precision, 'recall': recall}
+    # chop off background class if it exists
+    stats = {
+        'precision': precision if len(precision) == n_classes else precision[1:],
+        'recall': recall if len(recall) == n_classes else recall[1:]}
+
+    return stats
 
 
 def plot_training_curves(
@@ -78,7 +84,7 @@ def plot_training_curves(
 
     """
 
-    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'fc']
+    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'fc']
 
     metrics_dfs = []
     metrics_dfs.append(load_metrics_csv_as_df(metrics_file, metrics_list, dataset_ids=dataset_ids))
