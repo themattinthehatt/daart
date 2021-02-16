@@ -7,7 +7,7 @@ import pandas as pd
 import seaborn as sns
 from sklearn.metrics import recall_score, precision_score
 
-from daart.utils import make_dir_if_not_exists
+from daart.io import make_dir_if_not_exists
 
 
 def get_precision_recall(true_classes, pred_classes, background=0):

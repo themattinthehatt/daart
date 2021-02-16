@@ -8,6 +8,7 @@ import torch
 from torch import nn, optim, save, Tensor
 from tqdm import tqdm
 
+from daart.io import export_hparams
 from daart.train import EarlyStopping, Logger
 
 # to ignore imports for sphix-autoapidoc
@@ -182,11 +183,11 @@ class BaseModel(nn.Module):
         # -----------------------------------
         i_epoch = 0
         best_model_saved = False
-        for i_epoch in range(max_epochs + 1):
+        for i_epoch in tqdm(range(max_epochs + 1)):
             # Note: the 0th epoch has no training (randomly initialized model is evaluated) so we
             # cycle through `max_epochs` training epochs
 
-            print_epoch(i_epoch, max_epochs)
+            # print_epoch(i_epoch, max_epochs)
 
             # control how data is batched to that models can be restarted from a particular epoch
             torch.manual_seed(rng_seed_train + i_epoch)  # order of batches within datasets
@@ -196,7 +197,7 @@ class BaseModel(nn.Module):
             data_generator.reset_iterators('train')
 
             i_train = 0
-            for i_train in tqdm(range(data_generator.n_tot_batches['train'])):
+            for i_train in range(data_generator.n_tot_batches['train']):
 
                 # -----------------------------------
                 # train step
@@ -314,8 +315,8 @@ class BaseModel(nn.Module):
 
         # save out hparams
         if save_path is not None:
-            with open(os.path.join(save_path, 'hparams.pkl'), 'wb') as f:
-                pickle.dump(self.hparams, f)
+            from daart.io import export_hparams
+            export_hparams(self.hparams, filename=os.path.join(save_path, 'hparams.pkl'))
 
 
 def print_epoch(curr, total):

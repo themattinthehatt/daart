@@ -341,6 +341,12 @@ class DataGenerator(object):
         # get train/val/test batch indices for each dataset
         if trial_splits is None:
             trial_splits = {'train_tr': 8, 'val_tr': 1, 'test_tr': 1, 'gap_tr': 0}
+        elif isinstance(trial_splits, str):
+            ttypes = ['train_tr', 'val_tr', 'test_tr', 'gap_tr']
+            trial_splits = {
+                ttype: s for ttype, s in zip(ttypes, [int(s) for s in '9;1;0;0'.split(';')])}
+        else:
+            pass
         self.batch_ratios = [None] * self.n_datasets
         for i, dataset in enumerate(self.datasets):
             dataset.batch_idxs = split_trials(len(dataset), rng_seed=rng_seed, **trial_splits)

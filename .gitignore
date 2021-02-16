@@ -132,7 +132,7 @@ dmypy.json
 .pyre/
 
 # stuff to keep on my local machine
-scratch/
+daart_scratch/
 sandbox/
 *~
 
