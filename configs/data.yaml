@@ -1,0 +1,17 @@
+# number of labels
+input_size: 16
+
+# number of classes (including background)
+output_size: 5
+
+# experiment ids
+expt_ids:
+    - 2019_06_26_fly2
+    - 2019_10_21_fly1
+
+# base data directory
+data_dir: /media/mattw/fly/behavior/
+
+# base results directory
+results_dir: /media/mattw/fly/behavior/classifiers
+

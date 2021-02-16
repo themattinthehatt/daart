@@ -1,0 +1,56 @@
+# TRAINING PARAMTERS
+
+# adam learning rate
+learning_rate: 0.0001
+
+# batch size
+batch_size: 500
+
+# general l2 reg on parameters
+l2_reg: 0
+
+# minimum number of training epochs
+min_epochs: 1
+
+# maximum number of training epochs
+max_epochs: 4
+
+# frequency with which to log model performance on validation data
+val_check_interval: 1
+
+# True to use early stopping; False will train until max_epochs are reached
+enable_early_stop: False
+
+# number of epochs over which to average early stopping metric (total loss)
+early_stop_history: 20
+
+# True to save out last (as well as best) model
+save_last_model: False
+
+# fraction of training data to use
+train_frac: 1
+
+# trial splits: train;val;test;gap
+trial_splits: 9;1;0;0
+
+# control order in which data are served to model
+rng_seed_train: 0
+
+
+# COMPUTE RESOURCES PARAMTERS
+
+# device type: cpu | cuda
+device: cuda
+
+# add multiple gpus as 0;1;4 etc
+gpus_vis: 0
+
+# number of trials for test-tube to run on gpu
+# tt_n_gpu_trials: 1000
+
+# number of trials for test-tube to run on cpu
+tt_n_cpu_trials: 1000
+
+# number of cpu cores to use when running on cpu
+tt_n_cpu_workers: 5
+
