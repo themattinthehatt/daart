@@ -7,11 +7,11 @@ from torch import nn
 from daart.models.base import BaseModule, BaseModel
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['HardSegmenter', 'TemporalMLP', 'TemporalConv', 'LSTM', 'TGM']
+__all__ = ['Segmenter', 'TemporalMLP', 'TemporalConv', 'LSTM', 'TGM']
 
 
-class HardSegmenter(BaseModel):
-    """General wrapper class for models without soft labels."""
+class Segmenter(BaseModel):
+    """General wrapper class for behavioral segmentation models."""
 
     def __init__(self, hparams):
         """
@@ -26,6 +26,9 @@ class HardSegmenter(BaseModel):
             - n_hid_units (int): hidden units per layer
             - n_lags (int): number of lags in input data to use for temporal convolution
             - activation (str): 'linear' | 'relu' | 'lrelu' | 'sigmoid' | 'tanh'
+            - lambda_weak (float): hyperparam on weak label classification
+            - lambda_strong (float): hyperparam on srong label classification
+            - lambda_pred (float): hyperparam on next step prediction
 
         """
         super().__init__()
@@ -33,8 +36,8 @@ class HardSegmenter(BaseModel):
         self.model = None
         self.build_model()
 
-        # label loss based on cross entropy
-        self._loss = nn.CrossEntropyLoss()
+        # label loss based on cross entropy; don't compute gradient when target = 0
+        self._loss = nn.CrossEntropyLoss(ignore_index=0, reduction='mean')
 
     def __str__(self):
         """Pretty print model architecture."""
@@ -125,26 +128,64 @@ class HardSegmenter(BaseModel):
 
         """
 
-        predictors = data['markers'][0]
-        targets = data['labels'][0]
+        # define hyperparams
+        lambda_weak = self.hparams.get('lambda_weak', 0)
+        lambda_strong = self.hparams.get('lambda_strong', 0)
+        lambda_pred = self.hparams.get('lambda_pred', 0)
 
         # push data through model
-        outputs_dict = self.model(predictors)
+        outputs_dict = self.model(data['markers'][0])
 
-        # compute loss on allowed window of data
-        loss = self._loss(outputs_dict['labels'], targets)
+        # get masks that define where strong labels are
+        if 'labels_strong' in data:
+            labels_strong = data['labels_strong'][0]
+        else:
+            labels_strong = None
+
+        # initialize loss to zero
+        loss = 0
+
+        # compute loss on weak labels
+        if lambda_weak > 0:
+            labels_weak = data['labels_weak'][0]
+            # only compute loss where strong labels do not exist [indicated by a zero]
+            if labels_strong is not None:
+                loss_weak = self._loss(
+                    outputs_dict['labels'][labels_strong == 0], labels_weak[labels_strong == 0])
+            else:
+                loss_weak = self._loss(outputs_dict['labels'], labels_weak)
+            loss += lambda_weak * loss_weak
+            loss_weak_val = loss_weak.item()
+        else:
+            labels_weak = None
+            loss_weak_val = 0
+
+        # compute loss on weak labels
+        if lambda_strong > 0:
+            loss_strong = self._loss(outputs_dict['labels'], labels_strong)
+            loss += lambda_strong * loss_strong
+            loss_strong_val = loss_strong.item()
+        else:
+            loss_strong_val = 0
 
         if accumulate_grad:
             loss.backward()
 
-        # get loss value (weighted by batch size)
-        loss_val = loss.item()
+        # collect loss vals
+        if labels_weak is not None:
+            outputs_val = outputs_dict['labels'].cpu().detach().numpy()
+            fc = accuracy_score(labels_weak.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
+        else:
+            fc = np.nan
 
-        outputs_val = outputs_dict['labels'].cpu().detach().numpy()
+        loss_dict = {
+            'loss': loss.item(),
+            'loss_weak': loss_weak_val,
+            'loss_strong': loss_strong_val,
+            'fc': fc,
+        }
 
-        fc = accuracy_score(targets.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
-
-        return {'loss': loss_val, 'fc': fc}
+        return loss_dict
 
 
 class TemporalMLP(BaseModel):
@@ -153,21 +194,25 @@ class TemporalMLP(BaseModel):
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
-        self.decoder = None
+        self.classifier = None
+        self.predictor = None
         self.build_model()
 
     def __str__(self):
         """Pretty print model architecture."""
         format_str = '\nTemporalMLP architecture\n'
         format_str += '------------------------\n'
-        for i, module in enumerate(self.decoder):
+        for i, module in enumerate(self.classifier):
             format_str += str('    {}: {}\n'.format(i, module))
+        if self.predictor is not None:
+            for i, module in enumerate(self.predictor):
+                format_str += str('    {}: {}\n'.format(i, module))
         return format_str
 
     def build_model(self):
         """Construct the model using hparams."""
 
-        self.decoder = nn.ModuleList()
+        self.classifier = nn.ModuleList()
 
         global_layer_num = 0
 
@@ -187,7 +232,7 @@ class TemporalMLP(BaseModel):
             kernel_size=self.hparams['n_lags'] * 2 + 1,  # window around t
             padding=self.hparams['n_lags'])  # same output
         name = str('conv1d_layer_%02i' % global_layer_num)
-        self.decoder.add_module(name, layer)
+        self.classifier.add_module(name, layer)
 
         # add activation
         if self.hparams['n_hid_layers'] == 0:
@@ -209,7 +254,7 @@ class TemporalMLP(BaseModel):
 
         if activation:
             name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
-            self.decoder.add_module(name, activation)
+            self.classifier.add_module(name, activation)
 
         # update layer info
         global_layer_num += 1
@@ -229,7 +274,7 @@ class TemporalMLP(BaseModel):
             # add layer
             layer = nn.Linear(in_features=in_size, out_features=out_size)
             name = str('dense_layer_%02i' % global_layer_num)
-            self.decoder.add_module(name, layer)
+            self.classifier.add_module(name, layer)
 
             # add activation
             if i_layer == self.hparams['n_hid_layers'] - 1:
@@ -251,11 +296,18 @@ class TemporalMLP(BaseModel):
 
             if activation:
                 name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
-                self.decoder.add_module(name, activation)
+                self.classifier.add_module(name, activation)
 
             # update layer info
             global_layer_num += 1
             in_size = out_size
+
+        # -------------------------------------------------------------
+        # decoding layers for next step prediction
+        # -------------------------------------------------------------
+        if self.hparams.get('lambda_pred', 0) > 0:
+            # self.predictor = nn.ModuleList()
+            raise NotImplementedError
 
     def forward(self, x, **kwargs):
         """Process input data.
@@ -268,10 +320,10 @@ class TemporalMLP(BaseModel):
         Returns
         -------
         dict
-            - 'labels' (torch.Tensor): prediction of model
+            - 'labels' (torch.Tensor): model classification
 
         """
-        for name, layer in self.decoder.named_children():
+        for name, layer in self.classifier.named_children():
 
             if name == 'conv1d_layer_00':
                 # input is batch x in_channels x time

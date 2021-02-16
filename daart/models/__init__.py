@@ -1,1 +1,1 @@
-from daart.models.supervised import HardSegmenter
+from daart.models.supervised import Segmenter

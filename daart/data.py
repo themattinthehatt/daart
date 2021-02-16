@@ -248,14 +248,16 @@ class SingleDataset(data.Dataset):
                 # l = dlc[:, 2::3]
                 self.dtypes[signal] = 'float32'
 
-            elif signal == 'labels':
+            elif signal == 'labels_strong':
 
-                # assume particular pkl format
-                with open(self.paths[signal], 'rb') as f:
-                    data_curr = pickle.load(f)['states']
+                # assume output from deepethogram labeler
+                labels = np.genfromtxt(
+                    self.paths[signal], delimiter=',', dtype=np.int, encoding=None)
+                labels = labels[1:, 1:]  # get rid of headers, etc.
+                data_curr = np.argmax(labels, axis=1)
                 self.dtypes[signal] = 'int32'
 
-            elif signal == 'soft_labels':
+            elif signal == 'labels_weak':
 
                 # assume particular pkl format
                 with open(self.paths[signal], 'rb') as f:
