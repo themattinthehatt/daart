@@ -1,7 +1,13 @@
 """Evaluation functions for the daart package."""
 
-from sklearn.metrics import recall_score, precision_score
+import matplotlib.pyplot as plt
 import numpy as np
+import os
+import pandas as pd
+import seaborn as sns
+from sklearn.metrics import recall_score, precision_score
+
+from daart.utils import make_dir_if_not_exists
 
 
 def get_precision_recall(true_classes, pred_classes, background=0):
@@ -36,3 +42,108 @@ def get_precision_recall(true_classes, pred_classes, background=0):
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
 
     return {'precision': precision, 'recall': recall}
+
+
+def plot_training_curves(
+        metrics_file, dtype='val', dataset_ids=None, save_file=None, format='pdf'):
+    """Create training plots for each term in the objective function.
+
+    The `dtype` argument controls which type of trials are plotted ('train' or 'val').
+    Additionally, multiple models can be plotted simultaneously by varying one (and only one) of
+    the following parameters:
+
+    TODO
+
+    Each of these entries must be an array of length 1 except for one option, which can be an array
+    of arbitrary length (corresponding to already trained models). This function generates a single
+    plot with panels for each of the following terms:
+
+    - total loss
+    - weak label loss
+    - strong label loss
+    - prediction loss
+
+    Parameters
+    ----------
+    metrics_file : str
+        csv file saved during training
+    dtype : str
+        'train' | 'val'
+    dataset_ids : list, optional
+        dataset names for easier parsing
+    save_file : str, optional
+        absolute path of save file; does not need file extension
+    format : str, optional
+        format of saved image; 'pdf' | 'png' | 'jpeg' | ...
+
+    """
+
+    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'fc']
+
+    metrics_dfs = []
+    metrics_dfs.append(load_metrics_csv_as_df(metrics_file, metrics_list, dataset_ids=dataset_ids))
+    metrics_df = pd.concat(metrics_dfs, sort=False)
+
+    sns.set_style('white')
+    sns.set_context('talk')
+    data_queried = metrics_df[
+        (metrics_df.epoch > 10) & ~pd.isna(metrics_df.val) & (metrics_df.dtype == dtype)]
+    g = sns.FacetGrid(
+        data_queried, col='loss', col_wrap=2, hue=None, sharey=False, height=4)
+    g = g.map(plt.plot, 'epoch', 'val').add_legend()
+
+    if save_file is not None:
+        make_dir_if_not_exists(save_file)
+        g.savefig(save_file + '.' + format, dpi=300, format=format)
+
+
+def load_metrics_csv_as_df(metric_file, metrics_list, dataset_ids=None, test=False):
+    """Load metrics csv file and return as a pandas dataframe for easy plotting.
+
+    Parameters
+    ----------
+    metric_file : str
+        csv file saved during training
+    metrics_list : list
+        names of metrics to pull from csv; do not prepend with 'tr', 'val', or 'test'
+    dataset_ids : list, optional
+        dataset names for easier parsing
+    test : bool
+        True to only return test values (computed once at end of training)
+
+    Returns
+    -------
+    pandas.DataFrame object
+
+    """
+
+    metrics = pd.read_csv(metric_file)
+
+    # collect data from csv file
+    metrics_df = []
+    for i, row in metrics.iterrows():
+
+        if row['dataset'] == -1:
+            dataset = 'all'
+        elif dataset_ids is not None:
+            dataset = dataset_ids[row['dataset']]
+        else:
+            dataset = row['dataset']
+
+        if test:
+            test_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'test'}
+            for metric in metrics_list:
+                metrics_df.append(pd.DataFrame(
+                    {**test_dict, 'loss': metric, 'val': row['test_%s' % metric]}, index=[0]))
+        else:
+            # make dict for val data
+            val_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'val'}
+            for metric in metrics_list:
+                metrics_df.append(pd.DataFrame(
+                    {**val_dict, 'loss': metric, 'val': row['val_%s' % metric]}, index=[0]))
+            # make dict for train data
+            tr_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'train'}
+            for metric in metrics_list:
+                metrics_df.append(pd.DataFrame(
+                    {**tr_dict, 'loss': metric, 'val': row['tr_%s' % metric]}, index=[0]))
+    return pd.concat(metrics_df, sort=True)

@@ -215,7 +215,7 @@ class SingleDataset(data.Dataset):
 
         Parameters
         ----------
-        batch_size : `int`
+        batch_size : int
             batch size of data
 
         Returns

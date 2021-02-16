@@ -3,6 +3,7 @@ ipykernel
 matplotlib
 numpy
 opencv-python
+pandas
 scikit-learn
 scipy
 seaborn
