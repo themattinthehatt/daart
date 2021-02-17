@@ -70,7 +70,7 @@ class Segmenter(BaseModel):
 
         Parameters
         ----------
-        data_generator : ConcatSessionsGenerator object
+        data_generator : DataGenerator object
             data generator to serve data batches
 
         Returns
@@ -87,7 +87,7 @@ class Segmenter(BaseModel):
 
         softmax = nn.Softmax(dim=1)
 
-        # initialize container for latents
+        # initialize container for labels
         labels = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
             labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]

@@ -1,0 +1,2 @@
+Requirement already satisfied: scipy in /home/mattw/anaconda3/envs/daart/lib/python3.6/site-packages (1.1.0)
+Requirement already satisfied: numpy>=1.8.2 in /home/mattw/anaconda3/envs/daart/lib/python3.6/site-packages (from scipy) (1.19.5)

@@ -4,6 +4,7 @@ import math
 import numpy as np
 import os
 import pickle
+from scipy.special import softmax
 import torch
 from torch import nn, optim, save, Tensor
 from tqdm import tqdm
@@ -317,6 +318,55 @@ class BaseModel(nn.Module):
         if save_path is not None:
             from daart.io import export_hparams
             export_hparams(self.hparams, filename=os.path.join(save_path, 'hparams.pkl'))
+
+
+class Ensembler(object):
+    """Ensemble of models."""
+
+    def __init__(self, models):
+        self.models = models
+        self.n_models = len(models)
+
+    def predict_labels(self, data_generator):
+        """Combine class predictions from multiple models by averaging before softmax.
+
+        Parameters
+        ----------
+        data_generator : DataGenerator object
+            data generator to serve data batches
+
+        Returns
+        -------
+        dict
+            - 'predictions' (list of lists): first list is over datasets; second list is over
+              batches in the dataset; each element is a numpy array of the label probability
+              distribution
+            - 'weak_labels' (list of lists): corresponding weak labels
+            - 'labels' (list of lists): corresponding labels
+
+        """
+
+        # initialize container for labels
+        labels = [[] for _ in range(data_generator.n_datasets)]
+        for sess, dataset in enumerate(data_generator.datasets):
+            labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+
+        # partially fill container (gap trials will be included as nans)
+        dtypes = ['train', 'val', 'test']
+        for dtype in dtypes:
+            data_generator.reset_iterators(dtype)
+            for i in range(data_generator.n_tot_batches[dtype]):
+                data, sess = data_generator.next_batch(dtype)
+                predictors = data['markers'][0]
+                labels_curr = []
+                for model in self.models:
+                    outputs_dict = model(predictors)
+                    labels_curr.append(outputs_dict['labels'].cpu().detach().numpy()[None, ...])
+                labels_curr = np.mean(np.vstack(labels_curr), axis=0)
+                # push through softmax, since this is included in the loss and not model
+                labels[sess][data['batch_idx'].item()] = softmax(labels_curr, axis=1)
+
+        return {'labels': labels}
 
 
 def print_epoch(curr, total):

@@ -6,7 +6,7 @@ opencv-python
 pandas
 pyyaml
 scikit-learn
-scipy
+scipy>=1.2.0
 seaborn
 test-tube
 torch==1.3.1
