@@ -65,7 +65,7 @@ class Segmenter(BaseModel):
         """Process input data."""
         return self.model(x)
 
-    def predict_labels(self, data_generator):
+    def predict_labels(self, data_generator, return_scores=False):
         """
 
         Parameters
@@ -89,8 +89,10 @@ class Segmenter(BaseModel):
 
         # initialize container for labels
         labels = [[] for _ in range(data_generator.n_datasets)]
+        scores = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
             labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
 
         # partially fill container (gap trials will be included as nans)
         dtypes = ['train', 'val', 'test']
@@ -102,10 +104,14 @@ class Segmenter(BaseModel):
                 # targets = data['labels'][0]
                 outputs_dict = self.model(predictors)
                 # push through log-softmax, since this is included in the loss and not model
+
                 labels[sess][data['batch_idx'].item()] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
+                if return_scores:
+                    scores[sess][data['batch_idx'].item()] = \
+                        outputs_dict['labels'].cpu().detach().numpy()
 
-        return {'labels': labels}
+        return {'labels': labels, 'scores': scores}
 
     def loss(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.

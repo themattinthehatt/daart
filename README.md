@@ -32,14 +32,3 @@ To be able to use this environment for jupyter notebooks:
 ```
 (daart) $: python -m ipykernel install --user --name daart
 ```
-
-## Set paths
-
-Next, you should create a file in the `daart` package named `paths.py` that looks like the following:
-
-```python
-DATA_PATH = '/top/level/data/path/'
-RESULTS_PATH = '/top/level/results/path/'
-```
-
-This file contains the local paths on your machine, and will not be synced with github.

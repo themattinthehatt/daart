@@ -42,6 +42,12 @@ def get_precision_recall(true_classes, pred_classes, background=0):
     recall = recall_score(
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
 
+    # replace 0s with NaNs for classes with no ground truth
+    for n in range(precision.shape[0]):
+        if precision[n] == 0 and recall[n] == 0:
+            precision[n] = np.nan
+            recall[n] = np.nan
+
     # chop off background class if it exists
     p = precision if len(precision) == n_classes else precision[1:]
     r = recall if len(recall) == n_classes else recall[1:]
