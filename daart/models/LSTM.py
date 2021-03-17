@@ -134,9 +134,6 @@ class LSTM(BaseModel):
 
             global_layer_num += 1
         
-        
-        
-        pass
 
     def forward(self, x, **kwargs):
         """Process input data.
