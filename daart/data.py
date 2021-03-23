@@ -225,6 +225,8 @@ class SingleDataset(data.Dataset):
 
         """
 
+        allowed_signals = ['markers', 'labels_strong', 'labels_weak']
+
         for signal in self.signals:
 
             if signal == 'markers':
@@ -265,7 +267,9 @@ class SingleDataset(data.Dataset):
                 self.dtypes[signal] = 'int32'
 
             else:
-                raise ValueError('"%s" is an invalid signal type' % signal)
+                raise ValueError(
+                    '"{}" is an invalid signal type; must choose from {}'.format(
+                        signal, allowed_signals))
 
             # apply transforms to ALL data
             if self.transforms[signal]:

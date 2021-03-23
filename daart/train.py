@@ -6,6 +6,8 @@ import numpy as np
 import pandas as pd
 import torch
 
+from daart.io import make_dir_if_not_exists
+
 # to ignore imports for sphix-autoapidoc
 __all__ = ['Logger', 'EarlyStopping']
 
@@ -30,6 +32,7 @@ class Logger(object):
         """
         if save_path is not None:
             self.save_file = os.path.join(save_path, 'metrics.csv')
+            make_dir_if_not_exists(self.save_file)
         else:
             self.save_file = None
 
