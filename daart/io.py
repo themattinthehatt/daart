@@ -145,7 +145,6 @@ def find_experiment(hparams):
 
     # get model-specific params
     hparams_less = get_model_params(hparams)
-
     found_match = False
     version = None
     for version in tt_versions:
@@ -159,6 +158,10 @@ def find_experiment(hparams):
                 if hparams_['training_completed']:
                     found_match = True
                     break
+            # else:
+            #     for key in hparams_less.keys():
+            #         if hparams_[key] != hparams_less[key]:
+            #             print('{} : {}'.format(hparams_[key], hparams_less[key]))
         except IOError:
             continue
 

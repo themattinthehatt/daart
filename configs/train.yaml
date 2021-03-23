@@ -36,6 +36,9 @@ trial_splits: 9;1;0;0
 # control order in which data are served to model
 rng_seed_train: 0
 
+# plot final training curves
+plot_train_curves: False
+
 
 # COMPUTE RESOURCES PARAMTERS
 
