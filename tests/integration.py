@@ -47,23 +47,21 @@ def make_tmp_data(data_dir):
     for session in SESSIONS:
 
         # DLC markers
-        marker_file = os.path.join(data_dir, 'labels', session + '_labeled.csv')
+        marker_file = os.path.join(data_dir, session + '_markers.csv')
         file_dir = os.path.dirname(marker_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         make_dlc_markers(marker_file, TEMP_DATA['n_time'], TEMP_DATA['n_markers'])
 
         # heuristic labels
-        labels_file = os.path.join(
-            data_dir, 'segmentation', 'states-v3', session + '_beh-states-heuristic.pkl')
+        labels_file = os.path.join(data_dir, session + '_labels-heuristic.pkl')
         file_dir = os.path.dirname(labels_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         make_labels(labels_file, TEMP_DATA['n_time'], TEMP_DATA['n_labels'], nan_frac=0)
 
         # hand labels
-        hand_labels_file = os.path.join(
-            data_dir, 'labels_deepethogram', 'DATA', session, session + '_labels.csv')
+        hand_labels_file = os.path.join(data_dir, session + '_labels-hand.csv')
         file_dir = os.path.dirname(hand_labels_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
@@ -259,7 +257,7 @@ def main(args):
     print('done')
 
     config_dir = os.path.join(os.getcwd(), 'configs')
-    fit_file = os.path.join(os.getcwd(), 'daart_scratch', 'run_segmentation.py')
+    fit_file = os.path.join(os.getcwd(), 'examples', 'fit_models.py')
 
     # store results of tests
     print_strs = {}
