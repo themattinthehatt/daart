@@ -6,6 +6,7 @@ import os
 import pickle
 from scipy.special import softmax
 import torch
+from sklearn.metrics import accuracy_score
 from torch import nn, optim, save, Tensor
 from tqdm import tqdm
 
@@ -13,7 +14,7 @@ from daart.io import export_hparams
 from daart.train import EarlyStopping, Logger
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['BaseModule', 'BaseModel']
+__all__ = ['BaseModule', 'BaseModel', 'Segmenter', 'Ensembler']
 
 
 class BaseModule(nn.Module):
@@ -318,6 +319,208 @@ class BaseModel(nn.Module):
         if save_path is not None:
             from daart.io import export_hparams
             export_hparams(self.hparams, filename=os.path.join(save_path, 'hparams.pkl'))
+
+
+class Segmenter(BaseModel):
+    """General wrapper class for behavioral segmentation models."""
+
+    def __init__(self, hparams):
+        """
+
+        Parameters
+        ----------
+        hparams : dict
+            - model_type (str): 'temporal-mlp' | 'temporal-conv' | 'lstm' | 'tgm'
+            - input_size (int): number of input channels
+            - output_size (int): number of classes
+            - n_hid_layers (int): hidden layers of mlp/lstm network
+            - n_hid_units (int): hidden units per layer
+            - n_lags (int): number of lags in input data to use for temporal convolution
+            - activation (str): 'linear' | 'relu' | 'lrelu' | 'sigmoid' | 'tanh'
+            - lambda_weak (float): hyperparam on weak label classification
+            - lambda_strong (float): hyperparam on srong label classification
+            - lambda_pred (float): hyperparam on next step prediction
+
+        """
+        super().__init__()
+        self.hparams = hparams
+        self.model = None
+        self.build_model()
+
+        # label loss based on cross entropy; don't compute gradient when target = 0
+        self.class_loss = nn.CrossEntropyLoss(ignore_index=0, reduction='mean')
+        self.pred_loss = nn.MSELoss(reduction='mean')
+
+    def __str__(self):
+        """Pretty print model architecture."""
+        return self.model.__str__()
+
+    def build_model(self):
+        """Construct the model using hparams."""
+
+        if self.hparams['model_type'] == 'temporal-mlp':
+            from daart.models.temporalmlp import TemporalMLP
+            self.model = TemporalMLP(self.hparams)
+        elif self.hparams['model_type'] == 'temporal-conv':
+            from daart.models.temporalmlp import TemporalConv
+            raise NotImplementedError
+            # self.model = TemporalConv(self.hparams)
+        elif self.hparams['model_type'] == 'lstm':
+            from daart.models.lstm import LSTM
+            raise NotImplementedError
+            # self.model = LSTM(self.hparams)
+        elif self.hparams['model_type'] == 'tgm':
+            from daart.models.tgm import TGM
+            raise NotImplementedError
+            # self.model = TGM(self.hparams)
+        else:
+            raise ValueError('"%s" is not a valid model type' % self.hparams['model_type'])
+
+    def forward(self, x):
+        """Process input data."""
+        return self.model(x)
+
+    def predict_labels(self, data_generator, return_scores=False):
+        """
+
+        Parameters
+        ----------
+        data_generator : DataGenerator object
+            data generator to serve data batches
+
+        Returns
+        -------
+        dict
+            - 'predictions' (list of lists): first list is over datasets; second list is over
+              batches in the dataset; each element is a numpy array of the label probability
+              distribution
+            - 'weak_labels' (list of lists): corresponding weak labels
+            - 'labels' (list of lists): corresponding labels
+
+        """
+        self.eval()
+
+        softmax = nn.Softmax(dim=1)
+
+        # initialize container for labels
+        labels = [[] for _ in range(data_generator.n_datasets)]
+        scores = [[] for _ in range(data_generator.n_datasets)]
+        for sess, dataset in enumerate(data_generator.datasets):
+            labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+
+        # partially fill container (gap trials will be included as nans)
+        dtypes = ['train', 'val', 'test']
+        for dtype in dtypes:
+            data_generator.reset_iterators(dtype)
+            for i in range(data_generator.n_tot_batches[dtype]):
+                data, sess = data_generator.next_batch(dtype)
+                predictors = data['markers'][0]
+                # targets = data['labels'][0]
+                outputs_dict = self.model(predictors)
+                # push through log-softmax, since this is included in the loss and not model
+
+                labels[sess][data['batch_idx'].item()] = \
+                    softmax(outputs_dict['labels']).cpu().detach().numpy()
+                if return_scores:
+                    scores[sess][data['batch_idx'].item()] = \
+                        outputs_dict['labels'].cpu().detach().numpy()
+
+        return {'labels': labels, 'scores': scores}
+
+    def loss(self, data, accumulate_grad=True, **kwargs):
+        """Calculate negative log-likelihood loss for supervised models.
+
+        The batch is split into chunks if larger than a hard-coded `chunk_size` to keep memory
+        requirements low; gradients are accumulated across all chunks before a gradient step is
+        taken.
+
+        Parameters
+        ----------
+        data : dict
+            signals are of shape (1, time, n_channels)
+        accumulate_grad : bool, optional
+            accumulate gradient for training step
+
+        Returns
+        -------
+        dict
+            - 'loss' (float): total loss (negative log-like under specified noise dist)
+            - 'fc' (float): fraction correct
+
+        """
+
+        # define hyperparams
+        lambda_weak = self.hparams.get('lambda_weak', 0)
+        lambda_strong = self.hparams.get('lambda_strong', 0)
+        lambda_pred = self.hparams.get('lambda_pred', 0)
+
+        # push data through model
+        markers = data['markers'][0]
+        outputs_dict = self.model(markers)
+
+        # get masks that define where strong labels are
+        if lambda_strong > 0:
+            labels_strong = data['labels_strong'][0]
+        else:
+            labels_strong = None
+
+        # initialize loss to zero
+        loss = 0
+
+        # ------------------------------------
+        # compute loss on weak labels
+        # ------------------------------------
+        if lambda_weak > 0:
+            labels_weak = data['labels_weak'][0]
+            # only compute loss where strong labels do not exist [indicated by a zero]
+            if labels_strong is not None:
+                loss_weak = self.class_loss(
+                    outputs_dict['labels'][labels_strong == 0], labels_weak[labels_strong == 0])
+            else:
+                loss_weak = self.class_loss(outputs_dict['labels'], labels_weak)
+            loss += lambda_weak * loss_weak
+            loss_weak_val = loss_weak.item()
+            # compute fraction correct on weak labels
+            outputs_val = outputs_dict['labels'].cpu().detach().numpy()
+            fc = accuracy_score(labels_weak.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
+        else:
+            fc = np.nan
+            loss_weak_val = 0
+
+        # ------------------------------------
+        # compute loss on strong labels
+        # ------------------------------------
+        if lambda_strong > 0:
+            loss_strong = self.class_loss(outputs_dict['labels'], labels_strong)
+            loss += lambda_strong * loss_strong
+            loss_strong_val = loss_strong.item()
+        else:
+            loss_strong_val = 0
+
+        # ------------------------------------
+        # compute loss on one-step predictions
+        # ------------------------------------
+        if lambda_pred > 0:
+            loss_pred = self.pred_loss(markers[1:], outputs_dict['prediction'][:-1])
+            loss += lambda_pred * loss_pred
+            loss_pred_val = loss_pred.item()
+        else:
+            loss_pred_val = 0
+
+        if accumulate_grad:
+            loss.backward()
+
+        # collect loss vals
+        loss_dict = {
+            'loss': loss.item(),
+            'loss_weak': loss_weak_val,
+            'loss_strong': loss_strong_val,
+            'loss_pred': loss_pred_val,
+            'fc': fc,
+        }
+
+        return loss_dict
 
 
 class Ensembler(object):

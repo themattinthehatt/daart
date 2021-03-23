@@ -1,1 +1,1 @@
-from daart.models.supervised import Segmenter
+from daart.models.base import Segmenter
