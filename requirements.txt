@@ -4,6 +4,7 @@ matplotlib
 numpy
 opencv-python
 pandas
+pytest
 pyyaml
 scikit-learn
 scipy>=1.2.0

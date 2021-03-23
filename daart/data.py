@@ -23,7 +23,7 @@ from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
 
 
-__all__ = ['split_trials', 'compute_batches' 'SingleDataset', 'DataGenerator']
+__all__ = ['split_trials', 'compute_batches', 'SingleDataset', 'DataGenerator']
 
 
 def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0):
@@ -31,7 +31,7 @@ def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0
 
     The data is split into blocks that have gap trials between tr/val/test:
 
-    :obj:`train tr | gap tr | val tr | gap tr | test tr | gap tr`
+    `train tr | gap tr | val tr | gap tr | test tr | gap tr`
 
     Parameters
     ----------
@@ -91,6 +91,24 @@ def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0
 
 
 def compute_batches(data, batch_size):
+    """Compute batches of temporally contiguous data points.
+
+    Partial batches are not constructed; for example, if the number of time points is 24, and the
+    batch size is 10, only the first 20 points will be returned (in two batches).
+
+    Parameters
+    ----------
+    data : array-like
+        data to batch, of shape (T, N) or (T,)
+    batch_size : int
+        number of continguous values along dimension 0 to include per batch
+
+    Returns
+    -------
+    list
+        batched data
+
+    """
 
     if isinstance(data, list):
         # assume data has already been batched
