@@ -5,14 +5,15 @@ from torch import nn
 from daart.models.base import BaseModule, BaseModel
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['LSTM']
+__all__ = ['RNN']
 
 
-class LSTM(BaseModel):
+class RNN(BaseModel):
 
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
+        self.model_type = hparams.get('model_type', 'lstm').lower()
         self.encoder = None
         self.classifier = None
         self.predictor = None
@@ -42,17 +43,29 @@ class LSTM(BaseModel):
         global_layer_num = 0
 
         # ------------------------------
-        # trainable hidden 0 for LSTM
+        # trainable hidden 0 for RNN
         # ------------------------------
 
         in_size = self.hparams['input_size']
-        layer = nn.LSTM(
-            input_size=in_size,
-            hidden_size=self.hparams['n_hid_units'],
-            num_layers=self.hparams['n_hid_layers'],
-            batch_first=True,
-            bidirectional=self.hparams['bidirectional'])
-        name = str('LSTM_layer_%02i' % global_layer_num)
+        if self.model_type == 'lstm':
+            layer = nn.LSTM(
+                input_size=in_size,
+                hidden_size=self.hparams['n_hid_units'],
+                num_layers=self.hparams['n_hid_layers'],
+                batch_first=True,
+                bidirectional=self.hparams['bidirectional'])
+            name = str('LSTM_layer_%02i' % global_layer_num)
+        elif self.hparams['model_type'] == 'gru':
+            layer = nn.GRU(
+                input_size=in_size,
+                hidden_size=self.hparams['n_hid_units'],
+                num_layers=self.hparams['n_hid_layers'],
+                batch_first=True,
+                bidirectional=self.hparams['bidirectional'])
+            name = str('GRU_layer_%02i' % global_layer_num)
+        else:
+            raise NotImplementedError(
+                'Invalid model type "%s"; must choose "lstm" or "gru"' % self.model_type)
         self.encoder.add_module(name, layer)
 
         # update layer info
@@ -96,15 +109,27 @@ class LSTM(BaseModel):
 
             self.predictor = nn.ModuleList()
 
-            # lstm decoder
-            layer = nn.LSTM(
-                input_size=final_encoder_size,
-                hidden_size=self.hparams['n_hid_units'],
-                num_layers=self.hparams['n_hid_layers'],
-                batch_first=True,
-                bidirectional=self.hparams['bidirectional'])
+            # rnn decoder
+            if self.model_type == 'lstm':
+                layer = nn.LSTM(
+                    input_size=final_encoder_size,
+                    hidden_size=self.hparams['n_hid_units'],
+                    num_layers=self.hparams['n_hid_layers'],
+                    batch_first=True,
+                    bidirectional=self.hparams['bidirectional'])
+                name = str('LSTM(prediction)_layer_%02i' % global_layer_num)
+            elif self.hparams['model_type'] == 'gru':
+                layer = nn.GRU(
+                    input_size=final_encoder_size,
+                    hidden_size=self.hparams['n_hid_units'],
+                    num_layers=self.hparams['n_hid_layers'],
+                    batch_first=True,
+                    bidirectional=self.hparams['bidirectional'])
+                name = str('GRU(prediction)_layer_%02i' % global_layer_num)
+            else:
+                raise NotImplementedError(
+                    'Invalid model type "%s"; must choose "lstm" or "gru"' % self.model_type)
 
-            name = str('LSTM(prediction)_layer_%02i' % global_layer_num)
             self.predictor.add_module(name, layer)
 
             global_layer_num += 1
@@ -143,7 +168,7 @@ class LSTM(BaseModel):
         # push embedding through classifier to get labels
         z = x.squeeze()
         for name, layer in self.classifier.named_children():
-            if name[:4] == "LSTM":
+            if name[:4] == 'LSTM' or name[:3] == 'GRU':
                 raise NotImplementedError
                 # z, _ = layer(z)
             else:
@@ -153,7 +178,7 @@ class LSTM(BaseModel):
         if self.hparams.get('lambda_pred', 0) > 0:
             y = x
             for name, layer in self.predictor.named_children():
-                if name[:4] == "LSTM":
+                if name[:4] == 'LSTM' or name[:3] == 'GRU':
                     y, _ = layer(y)
                 else:
                     y = layer(y.squeeze())

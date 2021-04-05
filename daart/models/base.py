@@ -358,19 +358,19 @@ class Segmenter(BaseModel):
     def build_model(self):
         """Construct the model using hparams."""
 
-        if self.hparams['model_type'] == 'temporal-mlp':
+        if self.hparams['model_type'].lower() == 'temporal-mlp':
             from daart.models.temporalmlp import TemporalMLP
             self.model = TemporalMLP(self.hparams)
-        elif self.hparams['model_type'] == 'temporal-conv':
-            from daart.models.temporalmlp import TemporalConv
+        elif self.hparams['model_type'].lower() == 'temporal-conv':
             raise NotImplementedError
+            # from daart.models.temporalmlp import TemporalConv
             # self.model = TemporalConv(self.hparams)
-        elif self.hparams['model_type'] == 'lstm':
-            from daart.models.lstm import LSTM
-            self.model = LSTM(self.hparams)
-        elif self.hparams['model_type'] == 'tgm':
-            from daart.models.tgm import TGM
+        elif self.hparams['model_type'].lower() in ['lstm', 'gru']:
+            from daart.models.rnn import RNN
+            self.model = RNN(self.hparams)
+        elif self.hparams['model_type'].lower() == 'tgm':
             raise NotImplementedError
+            # from daart.models.tgm import TGM
             # self.model = TGM(self.hparams)
         else:
             raise ValueError('"%s" is not a valid model type' % self.hparams['model_type'])
