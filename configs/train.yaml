@@ -40,7 +40,7 @@ rng_seed_train: 0
 # COMPUTE RESOURCES PARAMTERS
 
 # device type: cpu | cuda
-device: cuda
+device: cpu
 
 # add multiple gpus as 0;1;4 etc
 gpus_vis: 0
@@ -49,7 +49,7 @@ gpus_vis: 0
 # tt_n_gpu_trials: 1000
 
 # number of trials for test-tube to run on cpu
-tt_n_cpu_trials: 1000
+tt_n_cpu_trials: 100
 
 # number of cpu cores to use when running on cpu
 tt_n_cpu_workers: 5
