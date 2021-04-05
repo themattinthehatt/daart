@@ -30,7 +30,7 @@ def run_main(hparams, *args):
     # start at random times (so test tube creates separate folders)
     t = time.time()
     np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
-    time.sleep(np.random.uniform(3))
+    time.sleep(np.random.uniform(2))
 
     # create test-tube experiment
     hparams['expt_ids'] = hparams['expt_ids'].split(';')
