@@ -5,6 +5,7 @@ from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
 from daart.models.base import BaseModule, BaseModel
+from daart.models.LSTM import LSTM
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['Segmenter', 'TemporalMLP', 'TemporalConv', 'LSTM', 'TGM']
@@ -53,7 +54,7 @@ class Segmenter(BaseModel):
             raise NotImplementedError
             # self.model = TemporalConv(self.hparams)
         elif self.hparams['model_type'] == 'lstm':
-            raise NotImplementedError
+            self.model = LSTM(self.hparams)
             # self.model = LSTM(self.hparams)
         elif self.hparams['model_type'] == 'tgm':
             raise NotImplementedError
@@ -65,7 +66,7 @@ class Segmenter(BaseModel):
         """Process input data."""
         return self.model(x)
 
-    def predict_labels(self, data_generator, return_scores=False):
+    def predict_labels(self, data_generator):
         """
 
         Parameters
@@ -89,10 +90,8 @@ class Segmenter(BaseModel):
 
         # initialize container for labels
         labels = [[] for _ in range(data_generator.n_datasets)]
-        scores = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
             labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
-            scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
 
         # partially fill container (gap trials will be included as nans)
         dtypes = ['train', 'val', 'test']
@@ -104,14 +103,10 @@ class Segmenter(BaseModel):
                 # targets = data['labels'][0]
                 outputs_dict = self.model(predictors)
                 # push through log-softmax, since this is included in the loss and not model
-
                 labels[sess][data['batch_idx'].item()] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
-                if return_scores:
-                    scores[sess][data['batch_idx'].item()] = \
-                        outputs_dict['labels'].cpu().detach().numpy()
 
-        return {'labels': labels, 'scores': scores}
+        return {'labels': labels}
 
     def loss(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.
