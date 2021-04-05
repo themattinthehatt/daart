@@ -367,8 +367,7 @@ class Segmenter(BaseModel):
             # self.model = TemporalConv(self.hparams)
         elif self.hparams['model_type'] == 'lstm':
             from daart.models.lstm import LSTM
-            raise NotImplementedError
-            # self.model = LSTM(self.hparams)
+            self.model = LSTM(self.hparams)
         elif self.hparams['model_type'] == 'tgm':
             from daart.models.tgm import TGM
             raise NotImplementedError

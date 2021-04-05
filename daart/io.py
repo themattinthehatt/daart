@@ -104,8 +104,19 @@ def get_model_params(hparams):
         hparams_less['lambda_weak'] = hparams['lambda_weak']
         hparams_less['lambda_strong'] = hparams['lambda_strong']
         hparams_less['lambda_pred'] = hparams['lambda_pred']
+    elif model_type == 'lstm':
+        hparams_less['learning_rate'] = hparams['learning_rate']
+        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+        if hparams['n_hid_layers'] != 0:
+            hparams_less['n_hid_units'] = hparams['n_hid_units']
+        hparams_less['activation'] = hparams['activation']
+        hparams_less['l2_reg'] = hparams['l2_reg']
+        hparams_less['lambda_weak'] = hparams['lambda_weak']
+        hparams_less['lambda_strong'] = hparams['lambda_strong']
+        hparams_less['lambda_pred'] = hparams['lambda_pred']
+        hparams_less['bidirectional'] = hparams['bidirectional']
     else:
-        raise NotImplementedError('"%s" is not a valid model class' % model_class)
+        raise NotImplementedError('"%s" is not a valid model type' % model_type)
 
     return hparams_less
 

@@ -10,8 +10,7 @@ expt_ids:
     - 2019_10_21_fly1
 
 # base data directory
-data_dir: /home/oo2218/Projects/Mice/fly_data
+data_dir: /path/to/data
 
 # base results directory
-results_dir: /home/oo2218/Projects/Mice/daart_results
-
+results_dir: /path/to/results
