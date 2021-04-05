@@ -10,7 +10,7 @@ from sklearn.metrics import recall_score, precision_score
 from daart.io import make_dir_if_not_exists
 
 
-def get_precision_recall(true_classes, pred_classes, background=0):
+def get_precision_recall(true_classes, pred_classes, background=0, n_classes=None):
     """Compute precision and recall for classifier.
 
     Parameters
@@ -22,6 +22,8 @@ def get_precision_recall(true_classes, pred_classes, background=0):
     background : int
         defines the background class that identifies points with no supervised label; these time
         points are omitted from the precision and recall calculations
+    n_classes : int, optional
+        total number of non-background classes; if NoneType, will be inferred from true classes
 
     Returns
     -------
@@ -35,7 +37,8 @@ def get_precision_recall(true_classes, pred_classes, background=0):
 
     # find all data points that are not background
     obs_idxs = np.where(true_classes != background)[0]
-    n_classes = len(np.unique(true_classes[obs_idxs]))
+    if n_classes is None:
+        n_classes = len(np.unique(true_classes[obs_idxs]))
 
     precision = precision_score(
         true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
