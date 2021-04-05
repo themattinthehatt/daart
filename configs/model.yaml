@@ -1,5 +1,8 @@
-# currently supported: temporal-mlp
-model_type: temporal-mlp
+# currently supported: temporal-mlp, lstm
+model_type: lstm
+
+# bidirectionality of LSTM
+bidirectional: true
 
 # hidden layers for both classifier and predictor networks
 n_hid_layers: 1

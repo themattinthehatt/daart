@@ -10,8 +10,8 @@ expt_ids:
     - 2019_10_21_fly1
 
 # base data directory
-data_dir: /media/mattw/fly/behavior/
+data_dir: /home/oo2218/Projects/Mice/fly_data
 
 # base results directory
-results_dir: /media/mattw/fly/behavior/classifiers
+results_dir: /home/oo2218/Projects/Mice/daart_results
 
