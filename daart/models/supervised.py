@@ -5,7 +5,7 @@ from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
 from daart.models.base import BaseModule, BaseModel
-from daart.models.LSTM import LSTM
+from daart.models.lstm import LSTM
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['Segmenter', 'TemporalMLP', 'TemporalConv', 'LSTM', 'TGM']
