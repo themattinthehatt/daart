@@ -115,6 +115,8 @@ def plot_training_curves(
         make_dir_if_not_exists(save_file)
         g.savefig(save_file + '.' + format, dpi=300, format=format)
 
+    plt.close()
+
 
 def load_metrics_csv_as_df(metric_file, metrics_list, expt_ids=None, test=False):
     """Load metrics csv file and return as a pandas dataframe for easy plotting.

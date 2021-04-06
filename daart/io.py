@@ -104,7 +104,7 @@ def get_model_params(hparams):
         hparams_less['lambda_weak'] = hparams['lambda_weak']
         hparams_less['lambda_strong'] = hparams['lambda_strong']
         hparams_less['lambda_pred'] = hparams['lambda_pred']
-    elif model_type == 'lstm':
+    elif model_type in ['lstm', 'gru']:
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
         if hparams['n_hid_layers'] != 0:

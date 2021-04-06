@@ -21,7 +21,7 @@ class RNN(BaseModel):
 
     def __str__(self):
         """Pretty print model architecture."""
-        format_str = '\nTemporalMLP architecture\n'
+        format_str = '\n%s architecture\n' % self.model_type.upper()
         format_str += '------------------------\n'
         format_str += 'Encoder:\n'
         for i, module in enumerate(self.encoder):

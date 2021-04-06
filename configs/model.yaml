@@ -1,7 +1,7 @@
 # currently supported: temporal-mlp, lstm
 model_type: lstm
 
-# bidirectionality of LSTM
+# bidirectionality of RNNs (LSTM, GRU)
 bidirectional: true
 
 # hidden layers for both classifier and predictor networks
@@ -30,4 +30,3 @@ tt_experiment_name: test
 
 # control initialization of model
 rng_seed_model: 0
-
