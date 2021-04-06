@@ -4,7 +4,7 @@ import math
 import numpy as np
 import os
 import pickle
-from scipy.special import softmax
+from scipy.special import scipy_softmax
 import torch
 from sklearn.metrics import accuracy_score
 from torch import nn, optim, save, Tensor
@@ -418,7 +418,6 @@ class Segmenter(BaseModel):
                 # targets = data['labels'][0]
                 outputs_dict = self.model(predictors)
                 # push through log-softmax, since this is included in the loss and not model
-
                 labels[sess][data['batch_idx'].item()] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
                 if return_scores:
@@ -529,21 +528,20 @@ class Ensembler(object):
         self.models = models
         self.n_models = len(models)
 
-    def predict_labels(self, data_generator):
+    def predict_labels(self, data_generator, combine_before_softmax=False):
         """Combine class predictions from multiple models by averaging before softmax.
 
         Parameters
         ----------
         data_generator : DataGenerator object
             data generator to serve data batches
+        combine_before_softmax : bool, optional
+            True to combine logits across models before taking softmax; False to take softmax for
+            each model then combine probabilities
 
         Returns
         -------
         dict
-            - 'predictions' (list of lists): first list is over datasets; second list is over
-              batches in the dataset; each element is a numpy array of the label probability
-              distribution
-            - 'weak_labels' (list of lists): corresponding weak labels
             - 'labels' (list of lists): corresponding labels
 
         """
@@ -563,10 +561,19 @@ class Ensembler(object):
                 labels_curr = []
                 for model in self.models:
                     outputs_dict = model(predictors)
-                    labels_curr.append(outputs_dict['labels'].cpu().detach().numpy()[None, ...])
+                    labels_tmp = outputs_dict['labels'].cpu().detach().numpy()
+                    if combine_before_softmax:
+                        labels_curr.append(labels_tmp[None, ...])
+                    else:
+                        labels_curr.append(scipy_softmax(labels_tmp, axis=1)[None, ...])
+
+                # average across models
                 labels_curr = np.mean(np.vstack(labels_curr), axis=0)
-                # push through softmax, since this is included in the loss and not model
-                labels[sess][data['batch_idx'].item()] = softmax(labels_curr, axis=1)
+                if combine_before_softmax:
+                    # push through softmax
+                    labels[sess][data['batch_idx'].item()] = scipy_softmax(labels_curr, axis=1)
+                else:
+                    labels[sess][data['batch_idx'].item()] = labels_curr
 
         return {'labels': labels}
 

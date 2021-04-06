@@ -1,4 +1,4 @@
-# currently supported: temporal-mlp, lstm
+# currently supported: temporal-mlp, lstm, gru
 model_type: lstm
 
 # bidirectionality of RNNs (LSTM, GRU)
@@ -10,7 +10,7 @@ n_hid_layers: 1
 # hidden units per layer
 n_hid_units: 32
 
-# half-width of temporal convolution window
+# half-width of temporal convolution window for temporal-mlp
 n_lags: 16
 
 # layer nonlinearity

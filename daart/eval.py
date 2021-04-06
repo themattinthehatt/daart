@@ -1,5 +1,6 @@
 """Evaluation functions for the daart package."""
 
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -81,6 +82,33 @@ def int_over_union(array1, array2):
         union = np.sum((array1 == val) | (array2 == val))
         iou[val] = intersection / union
     return iou
+
+
+def run_lengths(array):
+    """Compute distribution of run lengths for an array with integer entries.
+
+    Parameters
+    ----------
+    array : array-like
+        single-dimensional array
+
+    Returns
+    -------
+    dict
+        keys are integer values up to max value in array, values are lists of run lengths
+
+
+    Example
+    -------
+    >>> a = [1, 1, 1, 0, 0, 4, 4, 4, 4, 4, 4, 0, 1, 1, 1, 1]
+    >>> run_lengths(a)
+    {0: [2, 1], 1: [3, 4], 2: [], 3: [], 4: [6]}
+
+    """
+    seqs = {k: [] for k in np.arange(np.max(array) + 1)}
+    for key, iterable in itertools.groupby(seqs):
+        seqs[key].append(len(list(iterable)))
+    return seqs
 
 
 def plot_training_curves(

@@ -313,7 +313,7 @@ class DataGenerator(object):
     def __init__(
             self, ids_list, signals_list=None, transforms_list=None, paths_list=None,
             device='cuda', as_numpy=False, rng_seed=0, trial_splits=None, train_frac=1.0,
-            batch_size=100):
+            batch_size=100, num_workers=0, pin_memory=False):
         """
 
         Parameters
@@ -341,6 +341,11 @@ class DataGenerator(object):
             actually use
         batch_size : int, optional
             number of contiguous data points in each batch
+        num_workers : int, optional
+            number of cpu cores per dataset; defaults to 0 (all data loaded in main process)
+        pin_memory : bool, optional
+            if True, the data loader automatically pulls fetched data Tensors in pinned memory, and
+            thus enables faster transfer to CUDA-enabled GPUs
 
         """
         self.ids = ids_list
@@ -411,8 +416,8 @@ class DataGenerator(object):
                     dataset,
                     batch_size=1,
                     sampler=SubsetRandomSampler(dataset.batch_idxs[dtype]),
-                    num_workers=0,
-                    pin_memory=False)
+                    num_workers=num_workers,
+                    pin_memory=pin_memory)
 
         # create all iterators (will iterate through data loaders)
         self.dataset_iters = [None] * self.n_datasets
