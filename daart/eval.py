@@ -58,6 +58,31 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
     return {'precision': p, 'recall': r, 'f1': f1}
 
 
+def int_over_union(array1, array2):
+    """Compute intersection over union for two 1D arrays.
+
+    Parameters
+    ----------
+    array1 : array-like
+        integer array of shape (n,)
+    array2 : array-like
+        integer array of shape (n,)
+
+    Returns
+    -------
+    dict
+        keys are integer values in arrays, values are corresponding IoU (float)
+
+    """
+    vals = np.unique(np.concatenate([np.unique(array1), np.unique(array2)]))
+    iou = {val: np.nan for val in vals}
+    for val in vals:
+        intersection = np.sum((array1 == val) & (array2 == val))
+        union = np.sum((array1 == val) | (array2 == val))
+        iou[val] = intersection / union
+    return iou
+
+
 def plot_training_curves(
         metrics_file, dtype='val', expt_ids=None, save_file=None, format='pdf'):
     """Create training plots for each term in the objective function.
