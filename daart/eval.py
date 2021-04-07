@@ -14,6 +14,8 @@ from daart.io import make_dir_if_not_exists
 def get_precision_recall(true_classes, pred_classes, background=0, n_classes=None):
     """Compute precision and recall for classifier.
 
+    TODO: handle missing classes better
+
     Parameters
     ----------
     true_classes : array-like
@@ -106,7 +108,7 @@ def run_lengths(array):
 
     """
     seqs = {k: [] for k in np.arange(np.max(array) + 1)}
-    for key, iterable in itertools.groupby(seqs):
+    for key, iterable in itertools.groupby(array):
         seqs[key].append(len(list(iterable)))
     return seqs
 

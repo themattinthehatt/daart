@@ -4,7 +4,7 @@ import math
 import numpy as np
 import os
 import pickle
-from scipy.special import scipy_softmax
+from scipy.special import softmax as scipy_softmax
 import torch
 from sklearn.metrics import accuracy_score
 from torch import nn, optim, save, Tensor
@@ -146,8 +146,11 @@ class BaseModel(nn.Module):
         self.hparams['rng_seed_train'] = rng_seed_train
 
         # early stopping
+        # account for val check interval > 1; for example, if val_check_interval=5 and
+        # early_stop_history=20, then we only need the val loss to increase on 20 / 5 = 4
+        # successive checks (rather than 20) to terminate training
         patience = get_param('early_stop_history', 10)
-        self.hparams['early_stop_history'] = patience
+        self.hparams['early_stop_history'] = patience // val_check_interval
 
         # -----------------------------------
         # set up training
@@ -198,8 +201,8 @@ class BaseModel(nn.Module):
             logger.reset_metrics('train')
             data_generator.reset_iterators('train')
 
-            i_train = 0
-            for i_train in range(data_generator.n_tot_batches['train']):
+            i_batch = 0
+            for i_batch in range(data_generator.n_tot_batches['train']):
 
                 # -----------------------------------
                 # train step
@@ -225,7 +228,7 @@ class BaseModel(nn.Module):
                 # --------------------------------------
                 # check validation according to schedule
                 # --------------------------------------
-                curr_batch = (i_train + 1) + i_epoch * data_generator.n_tot_batches['train']
+                curr_batch = (i_batch + 1) + i_epoch * data_generator.n_tot_batches['train']
                 if np.any(curr_batch == val_check_batch):
 
                     logger.reset_metrics('val')
@@ -249,26 +252,27 @@ class BaseModel(nn.Module):
 
                     # export aggregated metrics on val data
                     logger.create_metric_row(
-                        'val', i_epoch, i_train, -1, trial=-1,
+                        dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
                         by_dataset=False, best_epoch=best_val_epoch)
                     # export individual dataset metrics on val data
                     if data_generator.n_datasets > 1:
-                        logger.create_metric_row(
-                            'val', i_epoch, i_train, dataset, trial=-1,
-                            by_dataset=True, best_epoch=best_val_epoch)
+                        for dataset in range(data_generator.n_datasets):
+                            logger.create_metric_row(
+                                dtype='val', epoch=i_epoch, batch=i_batch, dataset=dataset,
+                                trial=-1, by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
             # export training metrics at end of epoch
             # ---------------------------------------
             # export aggregated metrics on train data
             logger.create_metric_row(
-                'train', i_epoch, i_train, -1, trial=-1,
+                dtype='train', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
                 by_dataset=False, best_epoch=best_val_epoch)
             # export individual dataset metrics on train/val data
             if data_generator.n_datasets > 1:
                 for dataset in range(data_generator.n_datasets):
                     logger.create_metric_row(
-                        'train', i_epoch, i_train, dataset, trial=-1,
+                        dtype='train', epoch=i_epoch, batch=i_batch, dataset=dataset, trial=-1,
                         by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
