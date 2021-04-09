@@ -149,13 +149,12 @@ class BaseModel(nn.Module):
         # account for val check interval > 1; for example, if val_check_interval=5 and
         # early_stop_history=20, then we only need the val loss to increase on 20 / 5 = 4
         # successive checks (rather than 20) to terminate training
-        patience = get_param('early_stop_history', 10)
-        self.hparams['early_stop_history'] = patience // val_check_interval
+        patience = get_param('early_stop_history', 10) // val_check_interval
+        self.hparams['early_stop_history'] = patience
 
         # -----------------------------------
         # set up training
         # -----------------------------------
-
         # optimizer setup
         optimizer = torch.optim.Adam(
             self.get_parameters(), lr=learn_rate, weight_decay=l2_reg, amsgrad=True)
@@ -278,7 +277,8 @@ class BaseModel(nn.Module):
             # ---------------------------------------
             # check for early stopping
             # ---------------------------------------
-            if early_stop is not None:
+            curr_batch = (i_batch + 1) + i_epoch * data_generator.n_tot_batches['train']
+            if early_stop is not None and np.any(curr_batch == val_check_batch):
                 early_stop.on_val_check(i_epoch, logger.get_loss('val'))
                 if early_stop.should_stop:
                     break
