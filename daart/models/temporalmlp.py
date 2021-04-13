@@ -162,7 +162,8 @@ class TemporalMLP(BaseModel):
 
                 # add activation
                 if i_layer == self.hparams['n_hid_layers']:
-                    activation = None  # linear
+                    # no activation for final layer
+                    activation = None
                 else:
                     if self.hparams['activation'] == 'linear':
                         activation = None

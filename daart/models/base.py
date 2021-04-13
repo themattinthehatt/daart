@@ -365,10 +365,9 @@ class Segmenter(BaseModel):
         if self.hparams['model_type'].lower() == 'temporal-mlp':
             from daart.models.temporalmlp import TemporalMLP
             self.model = TemporalMLP(self.hparams)
-        elif self.hparams['model_type'].lower() == 'temporal-conv':
-            raise NotImplementedError
-            # from daart.models.temporalmlp import TemporalConv
-            # self.model = TemporalConv(self.hparams)
+        elif self.hparams['model_type'].lower() == 'tcn':
+            from daart.models.tcn import TCN
+            self.model = TCN(self.hparams)
         elif self.hparams['model_type'].lower() in ['lstm', 'gru']:
             from daart.models.rnn import RNN
             self.model = RNN(self.hparams)

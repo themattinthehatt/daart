@@ -25,7 +25,7 @@ CVIOLET = '\33[35m'
 TEMP_DATA = {
     'n_time': 1000,
     'n_labels': 3,
-    'n_markers': 3
+    'n_markers': 4
 }
 
 SESSIONS = ['sess-0', 'sess-1']
@@ -34,8 +34,8 @@ MODELS_TO_FIT = [
     {'model_type': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
     {'model_type': 'temporal-mlp', 'sessions': SESSIONS},
     {'model_type': 'lstm', 'sessions': [SESSIONS[0]]},
-    # {'model_type': 'lstm', 'sessions': SESSIONS}
     {'model_type': 'gru', 'sessions': [SESSIONS[0]]},
+    {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
 ]
 
 """
@@ -164,6 +164,17 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
                 'bidirectional': True},
+            'train': train_dict}
+    elif model == 'tcn':
+        new_values = {
+            'data': data_dict,
+            'model': {
+                'tt_experiment_name': expt_name,
+                'model_type': model,
+                'n_lags': 2,
+                'lambda_weak': lambda_weak,
+                'lambda_strong': lambda_strong,
+                'lambda_pred': lambda_pred},
             'train': train_dict}
     else:
         raise NotImplementedError
