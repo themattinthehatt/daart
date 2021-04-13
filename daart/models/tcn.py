@@ -51,7 +51,7 @@ class TCN(BaseModel):
         out_size = self.hparams['n_hid_units']
 
         t_sizes = [self.hparams['batch_size']]
-        for i_layer in range(self.hparams['n_hid_layers'] + 1):
+        for i_layer in range(self.hparams['n_hid_layers']):
 
             # conv -> activation -> maxpool
             self._build_tcn_encoder_block(
@@ -74,7 +74,7 @@ class TCN(BaseModel):
         in_size = self.hparams['n_hid_units']
         out_size = self.hparams['n_hid_units']
 
-        for i_layer in range(self.hparams['n_hid_layers'] + 1):
+        for i_layer in range(self.hparams['n_hid_layers']):
 
             # upsample -> conv -> activation
             self._build_tcn_decoder_block(
@@ -108,7 +108,7 @@ class TCN(BaseModel):
             in_size = self.hparams['n_hid_units']
             out_size = self.hparams['n_hid_units']
 
-            for i_layer in range(self.hparams['n_hid_layers'] + 1):
+            for i_layer in range(self.hparams['n_hid_layers']):
 
                 # upsample -> conv -> activation
                 self._build_tcn_decoder_block(
