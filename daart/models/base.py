@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pickle
 from scipy.special import softmax as scipy_softmax
+from scipy.stats import entropy
 import torch
 from sklearn.metrics import accuracy_score
 from torch import nn, optim, save, Tensor
@@ -389,6 +390,8 @@ class Segmenter(BaseModel):
         ----------
         data_generator : DataGenerator object
             data generator to serve data batches
+        return_scores : bool
+            return scores before they've been passed through softmax
 
         Returns
         -------
@@ -407,9 +410,11 @@ class Segmenter(BaseModel):
         # initialize container for labels
         labels = [[] for _ in range(data_generator.n_datasets)]
         scores = [[] for _ in range(data_generator.n_datasets)]
+        embedding = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
             labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
             scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            embedding[sess] = [np.array([]) for _ in range(dataset.n_trials)]
 
         # partially fill container (gap trials will be included as nans)
         dtypes = ['train', 'val', 'test']
@@ -423,11 +428,13 @@ class Segmenter(BaseModel):
                 # push through log-softmax, since this is included in the loss and not model
                 labels[sess][data['batch_idx'].item()] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
+                embedding[sess][data['batch_idx'].item()] = \
+                    outputs_dict['embedding'].cpu().detach().numpy()
                 if return_scores:
                     scores[sess][data['batch_idx'].item()] = \
                         outputs_dict['labels'].cpu().detach().numpy()
 
-        return {'labels': labels, 'scores': scores}
+        return {'labels': labels, 'scores': scores, 'embedding': embedding}
 
     def loss(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.
@@ -531,7 +538,7 @@ class Ensembler(object):
         self.models = models
         self.n_models = len(models)
 
-    def predict_labels(self, data_generator, combine_before_softmax=False):
+    def predict_labels(self, data_generator, combine_before_softmax=False, weights=None):
         """Combine class predictions from multiple models by averaging before softmax.
 
         Parameters
@@ -570,8 +577,26 @@ class Ensembler(object):
                     else:
                         labels_curr.append(scipy_softmax(labels_tmp, axis=1)[None, ...])
 
-                # average across models
-                labels_curr = np.mean(np.vstack(labels_curr), axis=0)
+                # combine predictions across models
+                if weights is None:
+                    # simple average across models
+                    labels_curr = np.mean(np.vstack(labels_curr), axis=0)
+                elif isinstance(weights, str) and weights == 'entropy':
+                    # weight each model at each time point by inverse entropy of distribution so
+                    # that more confident models have a higher weight
+                    labels_tmp = np.vstack(labels_curr)
+                    # compute entropy across labels
+                    ent = entropy(labels_tmp, axis=2)
+                    # low entropy = high confidence, weight these more
+                    w = 1.0 / ent
+                    # normalize over models
+                    w /= np.sum(w, axis=0)
+                    labels_curr = np.mean(labels_tmp * w[:, :, None], axis=0)
+                elif isinstance(weights, (list, tuple, np.ndarray)):
+                    # weight each model according to user-supplied weights
+                    labels_curr = np.average(np.vstack(labels_curr), axis=0, weights=weights)
+
+                # store predictions
                 if combine_before_softmax:
                     # push through softmax
                     labels[sess][data['batch_idx'].item()] = scipy_softmax(labels_curr, axis=1)
