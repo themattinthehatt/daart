@@ -36,6 +36,7 @@ MODELS_TO_FIT = [
     {'model_type': 'lstm', 'sessions': [SESSIONS[0]]},
     {'model_type': 'gru', 'sessions': [SESSIONS[0]]},
     {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
+    {'model_type': 'dtcn', 'sessions': [SESSIONS[0]]},
 ]
 
 """
@@ -165,12 +166,13 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
                 'lambda_pred': lambda_pred,
                 'bidirectional': True},
             'train': train_dict}
-    elif model == 'tcn':
+    elif model in ['tcn', 'dtcn']:
         new_values = {
             'data': data_dict,
             'model': {
                 'tt_experiment_name': expt_name,
                 'model_type': model,
+                'n_hid_layers': 2,
                 'n_lags': 2,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,

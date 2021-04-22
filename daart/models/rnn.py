@@ -2,7 +2,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
-from daart.models.base import BaseModule, BaseModel
+from daart.models.base import BaseModel
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['RNN']

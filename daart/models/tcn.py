@@ -7,10 +7,11 @@ from torch import nn
 from daart.models.base import BaseModel
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['TCN']
+__all__ = ['TCN', 'DilatedTCN']
 
 
 class TCN(BaseModel):
+    """Basic Temporal Convolutional Model with temporal downsampling."""
 
     def __init__(self, hparams):
         super().__init__()
@@ -280,3 +281,252 @@ class TCN(BaseModel):
             y = None
 
         return {'labels': z, 'prediction': y, 'embedding': x.squeeze().transpose(1, 0)}
+
+
+class DilatedTCN(BaseModel):
+    """Temporal Convolutional Model with dilated convolutions and no temporal downsampling.
+
+    Code adapted from: https://www.kaggle.com/ceshine/pytorch-temporal-convolutional-networks
+    """
+
+    def __init__(self, hparams):
+        super().__init__()
+        self.hparams = hparams
+        self.encoder = None
+        self.classifier = None
+        self.predictor = None
+        self.build_model()
+
+    def __str__(self):
+        format_str = '\nTCN architecture\n'
+        format_str += '------------------------\n'
+        format_str += 'Encoder:\n'
+        for i, module in enumerate(self.encoder):
+            format_str += str('    {}: {}\n'.format(i, module))
+        format_str += 'Classifier:\n'
+        for i, module in enumerate(self.classifier):
+            format_str += str('    {}: {}\n'.format(i, module))
+        format_str += '\n'
+        if self.predictor is not None:
+            format_str += 'Predictor:\n'
+            for i, module in enumerate(self.predictor):
+                format_str += str('    {}: {}\n'.format(i, module))
+        return format_str
+
+    def build_model(self):
+        """Construct the model using hparams."""
+
+        global_layer_num = 0
+
+        # encoder TCN
+        global_layer_num = self._build_encoder(global_layer_num=global_layer_num)
+
+        # linear classifier
+        self._build_classifier(global_layer_num=global_layer_num)
+
+        # predictor TCN
+        if self.hparams.get('lambda_pred', 0) > 0:
+            self._build_predictor(global_layer_num=global_layer_num)
+
+    def _build_encoder(self, global_layer_num):
+
+        self.encoder = nn.Sequential()
+
+        for i_layer in range(self.hparams['n_hid_layers']):
+
+            dilation = 2 ** i_layer
+            in_size = self.hparams['input_size'] if i_layer == 0 else self.hparams['n_hid_units']
+            out_size = self.hparams['n_hid_units']
+
+            # conv -> activation -> dropout (+ residual)
+            tcn_block = DilationBlock(
+                input_size=in_size, output_size=out_size, kernel_size=self.hparams['n_lags'],
+                stride=1, dilation=dilation, activation=self.hparams['activation'],
+                dropout=self.hparams.get('dropout', 0.2))
+            name = 'tcn_block_%02i' % global_layer_num
+            self.encoder.add_module(name, tcn_block)
+
+            # update layer info
+            global_layer_num += 1
+
+        return global_layer_num
+
+    def _build_classifier(self, global_layer_num):
+
+        self.classifier = nn.Sequential()
+
+        in_size = self.hparams['n_hid_units']
+        out_size = self.hparams['output_size']
+
+        # add layer (cross entropy loss handles activation)
+        layer = nn.Linear(in_features=in_size, out_features=out_size)
+        name = str('dense(classification)_layer_%02i' % global_layer_num)
+        self.classifier.add_module(name, layer)
+
+    def _build_predictor(self, global_layer_num):
+
+        self.predictor = nn.Sequential()
+
+        for i_layer in range(self.hparams['n_hid_layers']):
+
+            dilation = 2 ** (self.hparams['n_hid_layers'] - i_layer - 1)  # down by powers of 2
+            in_size = self.hparams['n_hid_units']
+            if i_layer == (self.hparams['n_hid_layers'] - 1):
+                # final layer
+                out_size = self.hparams['input_size']
+                final_activation = 'linear'
+            else:
+                # intermediate layer
+                out_size = self.hparams['n_hid_units']
+                final_activation = self.hparams['activation']
+
+            # conv -> activation -> dropout (+ residual)
+            tcn_block = DilationBlock(
+                input_size=in_size, output_size=out_size, kernel_size=self.hparams['n_lags'],
+                stride=1, dilation=dilation, activation=self.hparams['activation'],
+                final_activation=final_activation, dropout=self.hparams.get('dropout', 0.2))
+            name = 'tcn_block_%02i' % global_layer_num
+            self.predictor.add_module(name, tcn_block)
+
+            # update layer info
+            global_layer_num += 1
+
+        # # final dense layer
+        # layer = nn.Linear(in_features=in_size, out_features=out_size)
+        # name = str('dense_layer_%02i' % global_layer_num)
+        # self.predictor.add_module(name, layer)
+
+        return global_layer_num
+
+    def forward(self, x, **kwargs):
+        """Process input data.
+
+        Parameters
+        ----------
+        x : torch.Tensor object
+            input data
+
+        Returns
+        -------
+        dict
+            - 'labels' (torch.Tensor): model classification
+            - 'prediction' (torch.Tensor): one-step-ahead prediction
+            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
+
+        """
+
+        # push data through encoder to get latent embedding
+        # x = T x N (T = 500, N = 16)
+        # x.transpose(1, 0) -> x = N x T
+        # x.unsqueeze(0) -> x = 1 x N x T
+        # x = layer(x) -> x = 1 x M x T
+        # x.squeeze() -> x = M x T
+        # x.transpose(1, 0) -> x = T x M
+        x = self.encoder(x.transpose(1, 0).unsqueeze(0))
+
+        # push embedding through classifier to get labels
+        z = self.classifier(x.squeeze().transpose(1, 0))
+
+        # push embedding through predictor network to get data at subsequent time points
+        if self.hparams.get('lambda_pred', 0) > 0:
+            y = self.predictor(x).squeeze().transpose(1, 0)
+        else:
+            y = None
+
+        return {'labels': z, 'prediction': y, 'embedding': x.squeeze().transpose(1, 0)}
+
+
+class DilationBlock(nn.Module):
+    """Residual Temporal Block module for use with DilatedTCN class."""
+
+    def __init__(
+            self, input_size, output_size, kernel_size, stride=1, dilation=2, activation='relu',
+            dropout=0.2, final_activation=None):
+
+        super(DilationBlock, self).__init__()
+
+        self.conv0 = nn.utils.weight_norm(nn.Conv1d(
+            in_channels=input_size,
+            out_channels=output_size,
+            stride=stride,
+            dilation=dilation,
+            kernel_size=kernel_size * 2 + 1,  # window around t
+            padding=kernel_size * dilation))  # same output
+
+        self.conv1 = nn.utils.weight_norm(nn.Conv1d(
+            in_channels=output_size,
+            out_channels=output_size,
+            stride=stride,
+            dilation=dilation,
+            kernel_size=kernel_size * 2 + 1,  # window around t
+            padding=kernel_size * dilation))  # same output
+
+        # intermediate activations
+        if activation == 'linear':
+            self.activation = nn.Identity()
+        elif activation == 'relu':
+            self.activation = nn.ReLU()
+        elif activation == 'lrelu':
+            self.activation = nn.LeakyReLU(0.05)
+        elif activation == 'sigmoid':
+            self.activation = nn.Sigmoid()
+        elif activation == 'tanh':
+            self.activation = nn.Tanh()
+        else:
+            raise ValueError('"%s" is an invalid activation function' % activation)
+
+        # final activation
+        if final_activation is None:
+            final_activation = activation
+        if final_activation == 'linear':
+            self.final_activation = nn.Identity()
+        elif final_activation == 'relu':
+            self.final_activation = nn.ReLU()
+        elif final_activation == 'lrelu':
+            self.final_activation = nn.LeakyReLU(0.05)
+        elif final_activation == 'sigmoid':
+            self.final_activation = nn.Sigmoid()
+        elif final_activation == 'tanh':
+            self.final_activation = nn.Tanh()
+        else:
+            raise ValueError('"%s" is an invalid activation function' % final_activation)
+
+        self.dropout = nn.Dropout(dropout)
+
+        # build net
+        self.block = nn.Sequential()
+        # conv -> relu -> dropout block # 0
+        self.block.add_module('conv1d_layer_0', self.conv0)
+        self.block.add_module('%s_0' % activation, self.activation)
+        self.block.add_module('dropout_0', self.dropout)
+        # conv -> relu -> dropout block # 1
+        self.block.add_module('conv1d_layer_1', self.conv1)
+        self.block.add_module('%s_1' % activation, self.activation)
+        self.block.add_module('dropout_1', self.dropout)
+
+        # for downsampling residual connection
+        if input_size != output_size:
+            self.downsample = nn.Conv1d(input_size, output_size, kernel_size=1)
+        else:
+            self.downsample = None
+
+        self.init_weights()
+
+    def __str__(self):
+        format_str = 'DilationBlock\n'
+        for i, module in enumerate(self.block):
+            format_str += '        {}: {}\n'.format(i, module)
+        format_str += '        {}: residual connection\n'.format(i + 1)
+        format_str += '        {}: {}\n'.format(i + 2, self.final_activation)
+        return format_str
+
+    def init_weights(self):
+        self.conv0.weight.data.normal_(0, 0.01)
+        self.conv1.weight.data.normal_(0, 0.01)
+        if self.downsample is not None:
+            self.downsample.weight.data.normal_(0, 0.01)
+
+    def forward(self, x):
+        out = self.block(x)
+        res = x if self.downsample is None else self.downsample(x)
+        return self.final_activation(out + res)

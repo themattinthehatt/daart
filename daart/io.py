@@ -112,7 +112,7 @@ def get_model_params(hparams):
         hparams_less['activation'] = hparams['activation']
         hparams_less['l2_reg'] = hparams['l2_reg']
         hparams_less['bidirectional'] = hparams['bidirectional']
-    elif model_type == 'tcn':
+    elif model_type in ['tcn', 'dtcn']:
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
         if hparams['n_hid_layers'] != 0:

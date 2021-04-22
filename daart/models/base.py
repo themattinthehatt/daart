@@ -15,36 +15,7 @@ from daart.io import export_hparams
 from daart.train import EarlyStopping, Logger
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['BaseModule', 'BaseModel', 'Segmenter', 'Ensembler']
-
-
-class BaseModule(nn.Module):
-    """Template for PyTorch modules."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-
-    def __str__(self):
-        """Pretty print module architecture."""
-        raise NotImplementedError
-
-    def build_model(self):
-        """Build model from hparams."""
-        raise NotImplementedError
-
-    def forward(self, *args, **kwargs):
-        """Push data through module."""
-        raise NotImplementedError
-
-    def freeze(self):
-        """Prevent updates to module parameters."""
-        for param in self.parameters():
-            param.requires_grad = False
-
-    def unfreeze(self):
-        """Force updates to module parameters."""
-        for param in self.parameters():
-            param.requires_grad = True
+__all__ = ['BaseModel', 'Segmenter', 'Ensembler']
 
 
 class BaseModel(nn.Module):
@@ -369,6 +340,9 @@ class Segmenter(BaseModel):
         elif self.hparams['model_type'].lower() == 'tcn':
             from daart.models.tcn import TCN
             self.model = TCN(self.hparams)
+        elif self.hparams['model_type'].lower() == 'dtcn':
+            from daart.models.tcn import DilatedTCN
+            self.model = DilatedTCN(self.hparams)
         elif self.hparams['model_type'].lower() in ['lstm', 'gru']:
             from daart.models.rnn import RNN
             self.model = RNN(self.hparams)
