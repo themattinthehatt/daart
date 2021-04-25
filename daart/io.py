@@ -120,13 +120,15 @@ def get_model_params(hparams):
         hparams_less['n_lags'] = hparams['n_lags']
         hparams_less['activation'] = hparams['activation']
         hparams_less['l2_reg'] = hparams['l2_reg']
+        if model_type == 'dtcn':
+            hparams_less['dropout'] = hparams['dropout']
     else:
         raise NotImplementedError('"%s" is not a valid model type' % model_type)
 
     return hparams_less
 
 
-def find_experiment(hparams):
+def find_experiment(hparams, verbose=False):
     """Search testtube versions to find if experiment with the same hyperparameters has been fit.
 
     Parameters
@@ -134,6 +136,8 @@ def find_experiment(hparams):
     hparams : dict
         needs to contain enough information to specify a test tube experiment (model + training
         parameters)
+    verbose : bool
+        True to print desired hparams
 
     Returns
     -------
@@ -174,16 +178,21 @@ def find_experiment(hparams):
                 if hparams_['training_completed']:
                     found_match = True
                     break
-            # else:
-            #     for key in hparams_less.keys():
-            #         if hparams_[key] != hparams_less[key]:
-            #             print('{} : {}'.format(hparams_[key], hparams_less[key]))
+            else:
+                if verbose:
+                    print('unmatched keys:')
+                    for key in hparams_less.keys():
+                        if hparams_[key] != hparams_less[key]:
+                            print('{} : {}'.format(hparams_[key], hparams_less[key]))
+                    print()
         except IOError:
             continue
 
     if found_match:
         return int(version.split('_')[-1])
     else:
+        if verbose:
+            print('could not find match for requested hyperparameters: {}'.format(hparams_less))
         return None
 
 

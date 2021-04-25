@@ -340,9 +340,9 @@ class DilatedTCN(BaseModel):
 
             # conv -> activation -> dropout (+ residual)
             tcn_block = DilationBlock(
-                input_size=in_size, output_size=out_size, kernel_size=self.hparams['n_lags'],
-                stride=1, dilation=dilation, activation=self.hparams['activation'],
-                dropout=self.hparams.get('dropout', 0.2))
+                input_size=in_size, int_size=out_size, output_size=out_size,
+                kernel_size=self.hparams['n_lags'], stride=1, dilation=dilation,
+                activation=self.hparams['activation'], dropout=self.hparams.get('dropout', 0.2))
             name = 'tcn_block_%02i' % global_layer_num
             self.encoder.add_module(name, tcn_block)
 
@@ -375,26 +375,24 @@ class DilatedTCN(BaseModel):
                 # final layer
                 out_size = self.hparams['input_size']
                 final_activation = 'linear'
+                predictor_block = True
             else:
                 # intermediate layer
                 out_size = self.hparams['n_hid_units']
                 final_activation = self.hparams['activation']
+                predictor_block = False
 
             # conv -> activation -> dropout (+ residual)
             tcn_block = DilationBlock(
-                input_size=in_size, output_size=out_size, kernel_size=self.hparams['n_lags'],
-                stride=1, dilation=dilation, activation=self.hparams['activation'],
-                final_activation=final_activation, dropout=self.hparams.get('dropout', 0.2))
+                input_size=in_size, int_size=in_size, output_size=out_size,
+                kernel_size=self.hparams['n_lags'], stride=1, dilation=dilation,
+                activation=self.hparams['activation'], final_activation=final_activation,
+                dropout=self.hparams.get('dropout', 0.2), predictor_block=predictor_block)
             name = 'tcn_block_%02i' % global_layer_num
             self.predictor.add_module(name, tcn_block)
 
             # update layer info
             global_layer_num += 1
-
-        # # final dense layer
-        # layer = nn.Linear(in_features=in_size, out_features=out_size)
-        # name = str('dense_layer_%02i' % global_layer_num)
-        # self.predictor.add_module(name, layer)
 
         return global_layer_num
 
@@ -440,21 +438,21 @@ class DilationBlock(nn.Module):
     """Residual Temporal Block module for use with DilatedTCN class."""
 
     def __init__(
-            self, input_size, output_size, kernel_size, stride=1, dilation=2, activation='relu',
-            dropout=0.2, final_activation=None):
+            self, input_size, int_size, output_size, kernel_size, stride=1, dilation=2,
+            activation='relu', dropout=0.2, final_activation=None, predictor_block=False):
 
         super(DilationBlock, self).__init__()
 
         self.conv0 = nn.utils.weight_norm(nn.Conv1d(
             in_channels=input_size,
-            out_channels=output_size,
+            out_channels=int_size,
             stride=stride,
             dilation=dilation,
             kernel_size=kernel_size * 2 + 1,  # window around t
             padding=kernel_size * dilation))  # same output
 
         self.conv1 = nn.utils.weight_norm(nn.Conv1d(
-            in_channels=output_size,
+            in_channels=int_size,
             out_channels=output_size,
             stride=stride,
             dilation=dilation,
@@ -501,8 +499,9 @@ class DilationBlock(nn.Module):
         self.block.add_module('dropout_0', self.dropout)
         # conv -> relu -> dropout block # 1
         self.block.add_module('conv1d_layer_1', self.conv1)
-        self.block.add_module('%s_1' % activation, self.activation)
-        self.block.add_module('dropout_1', self.dropout)
+        if not predictor_block:
+            self.block.add_module('%s_1' % activation, self.activation)
+            self.block.add_module('dropout_1', self.dropout)
 
         # for downsampling residual connection
         if input_size != output_size:
