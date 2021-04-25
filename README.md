@@ -32,3 +32,6 @@ To be able to use this environment for jupyter notebooks:
 ```
 (daart) $: python -m ipykernel install --user --name daart
 ```
+
+## Getting started
+

@@ -292,9 +292,12 @@ class DilatedTCN(BaseModel):
     def __init__(self, hparams):
         super().__init__()
         self.hparams = hparams
+        self.hparams['pred_final_linear_layer'] = self.hparams.get('pred_final_linear_layer', True)
+
         self.encoder = None
         self.classifier = None
         self.predictor = None
+        # self.pred_final_linear_layer = None
         self.build_model()
 
     def __str__(self):
@@ -311,6 +314,8 @@ class DilatedTCN(BaseModel):
             format_str += 'Predictor:\n'
             for i, module in enumerate(self.predictor):
                 format_str += str('    {}: {}\n'.format(i, module))
+            # if self.pred_final_linear_layer is not None:
+            #     format_str += str('    {}: {}\n'.format(i + 1, self.pred_final_linear_layer))
         return format_str
 
     def build_model(self):
@@ -373,9 +378,12 @@ class DilatedTCN(BaseModel):
             in_size = self.hparams['n_hid_units']
             if i_layer == (self.hparams['n_hid_layers'] - 1):
                 # final layer
-                out_size = self.hparams['input_size']
-                final_activation = 'linear'
-                predictor_block = True
+                # out_size = self.hparams['input_size']
+                # final_activation = 'linear'
+                # predictor_block = True
+                out_size = self.hparams['n_hid_units']
+                final_activation = self.hparams['activation']
+                predictor_block = False
             else:
                 # intermediate layer
                 out_size = self.hparams['n_hid_units']
@@ -393,6 +401,16 @@ class DilatedTCN(BaseModel):
 
             # update layer info
             global_layer_num += 1
+
+        # add final fully-connected layer
+        if self.hparams['pred_final_linear_layer']:
+            dense = nn.Conv1d(
+                in_channels=out_size,
+                out_channels=self.hparams['input_size'],
+                kernel_size=1)  # kernel_size=1 <=> dense, fully connected layer
+            self.predictor.add_module('final_dense_%02i' % global_layer_num, dense)
+            # self.pred_final_linear_layer = nn.Linear(
+            #     in_features=out_size, out_features=self.hparams['input_size'])
 
         return global_layer_num
 
@@ -427,6 +445,9 @@ class DilatedTCN(BaseModel):
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
+            # y = self.predictor(x).squeeze().transpose(1, 0)
+            # if self.pred_final_linear_layer is not None:
+            #     y = self.pred_final_linear_layer(y)
             y = self.predictor(x).squeeze().transpose(1, 0)
         else:
             y = None
@@ -489,7 +510,7 @@ class DilationBlock(nn.Module):
         else:
             raise ValueError('"%s" is an invalid activation function' % final_activation)
 
-        self.dropout = nn.Dropout(dropout)
+        self.dropout = nn.Dropout2d(dropout)
 
         # build net
         self.block = nn.Sequential()
