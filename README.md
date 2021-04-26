@@ -8,14 +8,19 @@ following types of models on behavioral time series data:
 
 ## Installation
 
-First you'll have to install the `git` package in order to access the code on github. Follow the directions [here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) for your specific OS.
-Then, in the command line, navigate to where you'd like to install the `daart` package and move into that directory:
+First you'll have to install the `git` package in order to access the code on github. Follow the 
+directions [here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) 
+for your specific OS.
+Then, in the command line, navigate to where you'd like to install the `daart` package and move 
+into that directory:
 ```
 $: git clone https://github.com/themattinthehatt/daart
 $: cd daart
 ```
 
-Next, follow the directions [here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) to install the `conda` package for managing development environments. 
+Next, follow the directions 
+[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) 
+to install the `conda` package for managing development environments.
 Then, create a conda environment:
 
 ```
@@ -45,12 +50,12 @@ This script fits one or more models based on three yaml configuration files: one
 data, one describing the model, and one describing the training procedure. Example configuration
 files can be found in the `configs` directory.
 
-**_Note:_** Test-tube will automatically perform a hyperparameter search over any field that is provided as a
-list; for example, in the `model.yaml` file, change `n_hid_layers: 1` to `n_hid_layers: [1, 2, 3]` 
-to search over the number of hidden layers in the model.
+**_Note:_** Test-tube will automatically perform a hyperparameter search over any field that is 
+provided as a list; for example, in the `model.yaml` file, change `n_hid_layers: 1` to 
+`n_hid_layers: [1, 2, 3]` to search over the number of hidden layers in the model.
  
-Once you have set the desired parameters in these files (see comment on data paths below), you can then fit 
-models like so:
+Once you have set the desired parameters in these files (see comment on data paths below), you can 
+then fit models like so:
 
 ```
 (daart) $: python fit_models.py --data_config /path/to/data.yaml 

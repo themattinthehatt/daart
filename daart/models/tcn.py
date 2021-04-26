@@ -297,7 +297,6 @@ class DilatedTCN(BaseModel):
         self.encoder = None
         self.classifier = None
         self.predictor = None
-        # self.pred_final_linear_layer = None
         self.build_model()
 
     def __str__(self):
@@ -314,8 +313,6 @@ class DilatedTCN(BaseModel):
             format_str += 'Predictor:\n'
             for i, module in enumerate(self.predictor):
                 format_str += str('    {}: {}\n'.format(i, module))
-            # if self.pred_final_linear_layer is not None:
-            #     format_str += str('    {}: {}\n'.format(i + 1, self.pred_final_linear_layer))
         return format_str
 
     def build_model(self):
@@ -409,8 +406,6 @@ class DilatedTCN(BaseModel):
                 out_channels=self.hparams['input_size'],
                 kernel_size=1)  # kernel_size=1 <=> dense, fully connected layer
             self.predictor.add_module('final_dense_%02i' % global_layer_num, dense)
-            # self.pred_final_linear_layer = nn.Linear(
-            #     in_features=out_size, out_features=self.hparams['input_size'])
 
         return global_layer_num
 
@@ -445,9 +440,6 @@ class DilatedTCN(BaseModel):
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
-            # y = self.predictor(x).squeeze().transpose(1, 0)
-            # if self.pred_final_linear_layer is not None:
-            #     y = self.pred_final_linear_layer(y)
             y = self.predictor(x).squeeze().transpose(1, 0)
         else:
             y = None
