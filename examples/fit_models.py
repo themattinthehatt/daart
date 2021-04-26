@@ -207,7 +207,7 @@ if __name__ == '__main__':
 
     """To run:
 
-    (daart) $: python run_segmentation.py --data_config /path/to/data.yaml 
+    (daart) $: python fit_models.py --data_config /path/to/data.yaml 
        --model_config /path/to/model.yaml --train_config /path/to/train.yaml
 
     For example yaml files, see the `configs` subdirectory inside the daart home directory

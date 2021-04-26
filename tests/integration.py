@@ -176,7 +176,8 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
                 'n_lags': 2,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
-                'lambda_pred': lambda_pred},
+                'lambda_pred': lambda_pred,
+                'dropout': 0.1},
             'train': train_dict}
     else:
         raise NotImplementedError

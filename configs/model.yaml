@@ -1,8 +1,5 @@
-# currently supported: temporal-mlp, lstm, gru
+# currently supported: temporal-mlp, lstm, gru, tcn, dtcn
 model_type: lstm
-
-# bidirectionality of RNNs (LSTM, GRU)
-bidirectional: true
 
 # hidden layers for both classifier and predictor networks
 n_hid_layers: 1
@@ -30,3 +27,9 @@ tt_experiment_name: test
 
 # control initialization of model
 rng_seed_model: 0
+
+# bidirectionality of RNNs (LSTM, GRU)
+bidirectional: true
+
+# dropout for individual channels of dilated TCN models (soon to be for others)
+dropout: 0.1
