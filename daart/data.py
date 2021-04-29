@@ -249,22 +249,31 @@ class SingleDataset(data.Dataset):
 
             if signal == 'markers':
 
-                # assume dlc format
                 file_ext = self.paths[signal].split('.')[-1]
+
                 if file_ext == 'csv':
+                    # assume dlc/dgp format
                     from numpy import genfromtxt
                     dlc = genfromtxt(
                         self.paths[signal], delimiter=',', dtype=None, encoding=None)
                     dlc = dlc[3:, 1:].astype('float')  # get rid of headers, etc.
+                    x = dlc[:, 0::3]
+                    y = dlc[:, 1::3]
+                    data_curr = np.hstack([x, y])
                 elif file_ext == 'h5':
+                    # assume dlc/dgp format
                     with h5py.File(self.paths[signal], 'r') as f:
                         t = f['df_with_missing']['table'][()]
                     dlc = np.concatenate([t[i][1][None, :] for i in range(len(t))])
+                    x = dlc[:, 0::3]
+                    y = dlc[:, 1::3]
+                    data_curr = np.hstack([x, y])
+                elif file_ext == 'npy':
+                    # assume single array
+                    data_curr = np.load(self.paths[signal])
                 else:
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
-                x = dlc[:, 0::3]
-                y = dlc[:, 1::3]
-                data_curr = np.hstack([x, y])
+
                 # l = dlc[:, 2::3]
                 self.dtypes[signal] = 'float32'
 

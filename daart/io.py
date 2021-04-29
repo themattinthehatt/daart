@@ -34,7 +34,11 @@ def get_subdirs(path):
 def get_expt_dir(base_dir, expt_ids):
     if isinstance(expt_ids, list) and len(expt_ids) > 1:
         # multisession; see if multisession already exists; if not, create a new one
-        subdirs = get_subdirs(base_dir)
+        try:
+            subdirs = get_subdirs(base_dir)
+        except StopIteration:
+            # fresh results directory
+            subdirs = []
         expt_dir = None
         max_val = -1
         for subdir in subdirs:
