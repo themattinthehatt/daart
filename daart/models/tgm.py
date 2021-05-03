@@ -33,8 +33,10 @@ class TGM(BaseModel):
 
         Returns
         -------
-        torch.Tensor
-            mean prediction of model
+        dict
+            - 'labels' (torch.Tensor): model classification
+            - 'prediction' (torch.Tensor): one-step-ahead prediction
+            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
 
         """
         pass
