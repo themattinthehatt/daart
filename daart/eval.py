@@ -14,8 +14,6 @@ from daart.io import make_dir_if_not_exists
 def get_precision_recall(true_classes, pred_classes, background=0, n_classes=None):
     """Compute precision and recall for classifier.
 
-    TODO: handle missing classes better
-
     Parameters
     ----------
     true_classes : array-like
@@ -37,6 +35,7 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
     """
 
     assert true_classes.shape[0] == pred_classes.shape[0]
+    assert background == 0  # need to generalize
 
     # find all data points that are not background
     obs_idxs = np.where(true_classes != background)[0]
@@ -44,9 +43,11 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
         n_classes = len(np.unique(true_classes[obs_idxs]))
 
     precision = precision_score(
-        true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
+        true_classes[obs_idxs], pred_classes[obs_idxs],
+        labels=np.arange(1, n_classes + 1), average=None, zero_division=0)
     recall = recall_score(
-        true_classes[obs_idxs], pred_classes[obs_idxs], average=None, zero_division=0)
+        true_classes[obs_idxs], pred_classes[obs_idxs],
+        labels=np.arange(1, n_classes + 1), average=None, zero_division=0)
 
     # replace 0s with NaNs for classes with no ground truth
     for n in range(precision.shape[0]):
@@ -54,9 +55,9 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
             precision[n] = np.nan
             recall[n] = np.nan
 
-    # chop off background class if it exists
-    p = precision if len(precision) == n_classes else precision[1:]
-    r = recall if len(recall) == n_classes else recall[1:]
+    # compute f1
+    p = precision
+    r = recall
     f1 = 2 * p * r / (p + r)
     return {'precision': p, 'recall': r, 'f1': f1}
 

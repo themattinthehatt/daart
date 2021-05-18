@@ -380,7 +380,7 @@ class DataGenerator(object):
         elif isinstance(trial_splits, str):
             ttypes = ['train_tr', 'val_tr', 'test_tr', 'gap_tr']
             trial_splits = {
-                ttype: s for ttype, s in zip(ttypes, [int(s) for s in '9;1;0;0'.split(';')])}
+                ttype: s for ttype, s in zip(ttypes, [int(s) for s in trial_splits.split(';')])}
         else:
             pass
         self.batch_ratios = [None] * self.n_datasets
