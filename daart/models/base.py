@@ -458,9 +458,10 @@ class Segmenter(BaseModel):
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
                 loss_weak = self.class_loss(
-                    outputs_dict['labels'][labels_strong == 0], labels_weak[labels_strong == 0])
+                    outputs_dict['labels_weak'][labels_strong == 0],
+                    labels_weak[labels_strong == 0])
             else:
-                loss_weak = self.class_loss(outputs_dict['labels'], labels_weak)
+                loss_weak = self.class_loss(outputs_dict['labels_weak'], labels_weak)
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
             # compute fraction correct on weak labels

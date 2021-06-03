@@ -296,6 +296,7 @@ class DilatedTCN(BaseModel):
 
         self.encoder = None
         self.classifier = None
+        self.classifier_weak = None
         self.predictor = None
         self.build_model()
 
@@ -323,8 +324,11 @@ class DilatedTCN(BaseModel):
         # encoder TCN
         global_layer_num = self._build_encoder(global_layer_num=global_layer_num)
 
-        # linear classifier
-        self._build_classifier(global_layer_num=global_layer_num)
+        # linear classifier (hand labels)
+        self.classifier = self._build_classifier(global_layer_num=global_layer_num)
+
+        # linear classifier (heuristic labels)
+        self.classifier_weak = self._build_classifier(global_layer_num=global_layer_num)
 
         # predictor TCN
         if self.hparams.get('lambda_pred', 0) > 0:
@@ -355,7 +359,7 @@ class DilatedTCN(BaseModel):
 
     def _build_classifier(self, global_layer_num):
 
-        self.classifier = nn.Sequential()
+        classifier = nn.Sequential()
 
         in_size = self.hparams['n_hid_units']
         out_size = self.hparams['output_size']
@@ -363,7 +367,9 @@ class DilatedTCN(BaseModel):
         # add layer (cross entropy loss handles activation)
         layer = nn.Linear(in_features=in_size, out_features=out_size)
         name = str('dense(classification)_layer_%02i' % global_layer_num)
-        self.classifier.add_module(name, layer)
+        classifier.add_module(name, layer)
+
+        return classifier
 
     def _build_predictor(self, global_layer_num):
 
@@ -435,8 +441,13 @@ class DilatedTCN(BaseModel):
         # x.transpose(1, 0) -> x = T x M
         x = self.encoder(x.transpose(1, 0).unsqueeze(0))
 
-        # push embedding through classifier to get labels
-        z = self.classifier(x.squeeze().transpose(1, 0))
+        # push embedding through classifiers to get labels
+        xt = x.squeeze().transpose(1, 0)
+        z = self.classifier(xt)
+        if self.hparams.get('lambda_weak', 0) > 0:
+            z_weak = self.classifier_weak(xt)
+        else:
+            z_weak = None
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
@@ -444,7 +455,7 @@ class DilatedTCN(BaseModel):
         else:
             y = None
 
-        return {'labels': z, 'prediction': y, 'embedding': x.squeeze().transpose(1, 0)}
+        return {'labels': z, 'labels_weak': z_weak, 'prediction': y, 'embedding': xt}
 
 
 class DilationBlock(nn.Module):
