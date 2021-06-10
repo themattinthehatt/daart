@@ -16,6 +16,7 @@ class RNN(BaseModel):
         self.model_type = hparams.get('model_type', 'lstm').lower()
         self.encoder = None
         self.classifier = None
+        self.classifier_weak = None
         self.predictor = None
         self.build_model()
 
@@ -73,31 +74,16 @@ class RNN(BaseModel):
         final_encoder_size = (int(self.hparams['bidirectional']) + 1) * self.hparams['n_hid_units']
 
         # ----------------------------
-        # Classifier
+        # Classifiers
         # ----------------------------
 
-        self.classifier = nn.ModuleList()
+        # linear classifier (hand labels)
+        self.classifier = self._build_classifier(
+            in_size=final_encoder_size, global_layer_num=global_layer_num)
 
-        # layer = nn.LSTM(
-        #     input_size=in_size,
-        #     hidden_size=self.hparams['n_hid_units'],
-        #     num_layers=self.hparams['n_hid_layers'],
-        #     bidirectional=self.hparams['bidirectional'])
-        #
-        # name = str('LSTM(classification)_layer_%02i' % global_layer_num)
-        # self.classifier.add_module(name, layer)
-        #
-        # global_layer_num += 1
-        #
-        # # Last layer
-        # self.hidden_to_output = nn.Linear(self.in_size, self.hparams['output_size'])
-
-        out_size = self.hparams['output_size']
-
-        # add layer (cross entropy loss handles activation)
-        layer = nn.Linear(in_features=final_encoder_size, out_features=out_size)
-        name = str('dense(classification)_layer_%02i' % global_layer_num)
-        self.classifier.add_module(name, layer)
+        # linear classifier (heuristic labels)
+        self.classifier_weak = self._build_classifier(
+            in_size=final_encoder_size, global_layer_num=global_layer_num)
 
         global_layer_num += 1
 
@@ -143,6 +129,19 @@ class RNN(BaseModel):
 
             global_layer_num += 1
 
+    def _build_classifier(self, in_size, global_layer_num):
+
+        classifier = nn.Sequential()
+
+        out_size = self.hparams['output_size']
+
+        # add layer (cross entropy loss handles activation)
+        layer = nn.Linear(in_features=in_size, out_features=out_size)
+        name = str('dense(classification)_layer_%02i' % global_layer_num)
+        classifier.add_module(name, layer)
+
+        return classifier
+
     def forward(self, x, **kwargs):
         """Process input data.
 
@@ -166,13 +165,12 @@ class RNN(BaseModel):
             x, _ = layer(x)
 
         # push embedding through classifier to get labels
-        z = x.squeeze()
-        for name, layer in self.classifier.named_children():
-            if name[:4] == 'LSTM' or name[:3] == 'GRU':
-                raise NotImplementedError
-                # z, _ = layer(z)
-            else:
-                z = layer(z)
+        xt = x.squeeze()
+        z = self.classifier(xt)
+        if self.hparams.get('lambda_weak', 0) > 0:
+            z_weak = self.classifier_weak(xt)
+        else:
+            z_weak = None
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
@@ -185,4 +183,4 @@ class RNN(BaseModel):
         else:
             y = None
 
-        return {'labels': z, 'prediction': y, 'embedding': x.squeeze()}
+        return {'labels': z, 'labels_weak': z_weak, 'prediction': y, 'embedding': xt}

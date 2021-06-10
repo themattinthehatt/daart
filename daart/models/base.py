@@ -338,8 +338,9 @@ class Segmenter(BaseModel):
             from daart.models.temporalmlp import TemporalMLP
             self.model = TemporalMLP(self.hparams)
         elif self.hparams['model_type'].lower() == 'tcn':
-            from daart.models.tcn import TCN
-            self.model = TCN(self.hparams)
+            raise NotImplementedError('Split classifiers have not been implemented for TCN')
+            # from daart.models.tcn import TCN
+            # self.model = TCN(self.hparams)
         elif self.hparams['model_type'].lower() == 'dtcn':
             from daart.models.tcn import DilatedTCN
             self.model = DilatedTCN(self.hparams)

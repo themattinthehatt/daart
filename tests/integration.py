@@ -35,7 +35,7 @@ MODELS_TO_FIT = [
     {'model_type': 'temporal-mlp', 'sessions': SESSIONS},
     {'model_type': 'lstm', 'sessions': [SESSIONS[0]]},
     {'model_type': 'gru', 'sessions': [SESSIONS[0]]},
-    {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
+    # {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
     {'model_type': 'dtcn', 'sessions': [SESSIONS[0]]},
 ]
 
