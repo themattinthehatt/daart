@@ -1,6 +1,6 @@
 # daart: deep learning for animal action recognition toolbox
-A collection of tools for analyzing behavioral data. This repo currently supports fitting the 
-following types of models on behavioral time series data:
+A collection of tools for the discrete classification of animal behaviors using low-dimensional representations of videos (such as skeletons provided by tracking algorithms). Our approach combines strong supervision, weak supervision, and self-supervision to improve model performance. See the preprint [here](https://www.biorxiv.org/content/10.1101/2021.06.16.448685v1) for more details. This repo currently supports fitting the 
+following types of base models on behavioral time series data:
 * Dense MLP network with initial 1D convolutional layer
 * RNNs - both LSTMs and GRUs
 * Temporal Convolutional Networks (TCNs)
