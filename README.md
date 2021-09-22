@@ -69,13 +69,16 @@ a `data_dir` field. The `fit_models.py` script assumes data is stored in the fol
 this can easily be adapted by changing the appropriate lines in a copy of the `fit_example.py` 
 script:
 
-* markers: `data_dir/[expt_id]_markers.csv` or `data_dir/[expt_id]_markers.h5`; the standard file 
-formats used by DLC/DGP are currently supported.
+* markers: `data_dir/markers/[expt_id]_labeled.csv` or `data_dir/markers/[expt_id]_labeled.h5`; 
+the standard file formats used by DLC/DGP are currently supported.
  
-* hand labels: `data_dir/[expt_id]_labels-hand.csv`; a binary matrix of shape `(T, n_classes + 1)`,
-where the first column represents the `background` class; the gradients contributed by these time 
-points are zeroed out during training.
+* hand labels: `data_dir/labels-hand/[expt_id]_labels.csv`; a binary matrix of shape 
+`(T, n_classes + 1)`, where the first column represents the `background` class; the gradients 
+contributed by these time points are zeroed out during training.
 
-* heuristic labels: `data_dir/[expt_id]_labels-heuristic.csv`; an array of shape `(T,)` that 
+* heuristic labels: `data_dir/labels-heuristic/[expt_id]_labels.pkl`; a dictionary that contains
+the heuristic labels; the key `states` must index an array of shape `(T,)` that 
 contains the single discrete state assigned to each time point; `0` corresponds to background 
 class.
+
+See the directory `daart/data` for example fly data used in the preprint.

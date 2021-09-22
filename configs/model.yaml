@@ -1,17 +1,17 @@
 # currently supported: temporal-mlp, lstm, gru, tcn, dtcn
-model_type: lstm
+model_type: dtcn
 
 # hidden layers for both classifier and predictor networks
-n_hid_layers: 1
+n_hid_layers: 2
 
 # hidden units per layer
 n_hid_units: 32
 
-# half-width of temporal convolution window for temporal-mlp
-n_lags: 16
+# half-width of temporal convolution window for temporal-mlp, tcns
+n_lags: 4
 
 # layer nonlinearity
-activation: relu
+activation: lrelu
 
 # hyperparam on classifying weak labels
 lambda_weak: 1

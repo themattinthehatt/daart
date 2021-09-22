@@ -52,15 +52,17 @@ def run_main(hparams, *args):
     for expt_id in hparams['expt_ids']:
 
         # DLC markers
-        markers_file = os.path.join(hparams['data_dir'], expt_id + '_markers.h5')
+        markers_file = os.path.join(hparams['data_dir'], 'markers', expt_id + '_labeled.h5')
         if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], expt_id + '_markers.csv')
+            markers_file = os.path.join(hparams['data_dir'], 'markers', expt_id + '_labeled.csv')
 
         # heuristic labels
-        labels_file = os.path.join(hparams['data_dir'], expt_id + '_labels-heuristic.pkl')
+        labels_file = os.path.join(
+            hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.pkl')
 
         # hand labels
-        hand_labels_file = os.path.join(hparams['data_dir'], expt_id + '_labels-hand.csv')
+        hand_labels_file = os.path.join(
+            hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
 
         # define data generator signals
         signals.append(['markers', 'labels_weak', 'labels_strong'])
@@ -212,7 +214,7 @@ if __name__ == '__main__':
 
     For example yaml files, see the `configs` subdirectory inside the daart home directory
 
-    NOTE: this script assumes a specific naming convention for markers and labels (see L54-L63). 
+    NOTE: this script assumes a specific naming convention for markers and labels (see L54-L65). 
     You'll need to update these lines to be consistent with your own naming conventions.
     
     """

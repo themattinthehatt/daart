@@ -2,12 +2,12 @@
 input_size: 16
 
 # number of classes (including background)
-output_size: 5
+output_size: 6
 
 # experiment ids
 expt_ids:
     - 2019_06_26_fly2
-    - 2019_10_21_fly1
+    - 2019_08_07_fly2
 
 # base data directory
 data_dir: /path/to/data
