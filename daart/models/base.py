@@ -306,10 +306,11 @@ class Segmenter(BaseModel):
         Parameters
         ----------
         hparams : dict
-            - model_type (str): 'temporal-mlp' | 'temporal-conv' | 'lstm' | 'tgm'
+            - model_type (str): 'temporal-mlp' | 'dtcn' | 'lstm' | 'gru' | 'tgm'
+            - rng_seed_model (int): random seed to control weight initialization
             - input_size (int): number of input channels
             - output_size (int): number of classes
-            - n_hid_layers (int): hidden layers of mlp/lstm network
+            - n_hid_layers (int): hidden layers of network architecture
             - n_hid_units (int): hidden units per layer
             - n_lags (int): number of lags in input data to use for temporal convolution
             - activation (str): 'linear' | 'relu' | 'lrelu' | 'sigmoid' | 'tanh'
@@ -333,6 +334,11 @@ class Segmenter(BaseModel):
 
     def build_model(self):
         """Construct the model using hparams."""
+
+        # set random seeds for control over model initialization
+        rng_seed_model = hparams.get('rng_seed_model', 0)
+        torch.manual_seed(rng_seed_model)
+        np.random.seed(rng_seed_model)
 
         if self.hparams['model_type'].lower() == 'temporal-mlp':
             from daart.models.temporalmlp import TemporalMLP
