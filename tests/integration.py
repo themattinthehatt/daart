@@ -51,21 +51,21 @@ def make_tmp_data(data_dir):
     for session in SESSIONS:
 
         # DLC markers
-        marker_file = os.path.join(data_dir, session + '_markers.csv')
+        marker_file = os.path.join(data_dir, 'markers', session + '_labeled.csv')
         file_dir = os.path.dirname(marker_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         make_dlc_markers(marker_file, TEMP_DATA['n_time'], TEMP_DATA['n_markers'])
 
         # heuristic labels
-        labels_file = os.path.join(data_dir, session + '_labels-heuristic.pkl')
+        labels_file = os.path.join(data_dir, 'labels-heuristic', session + '_labels.pkl')
         file_dir = os.path.dirname(labels_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         make_labels(labels_file, TEMP_DATA['n_time'], TEMP_DATA['n_labels'], nan_frac=0)
 
         # hand labels
-        hand_labels_file = os.path.join(data_dir, session + '_labels-hand.csv')
+        hand_labels_file = os.path.join(data_dir, 'labels-hand', session + '_labels.csv')
         file_dir = os.path.dirname(hand_labels_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
@@ -88,7 +88,7 @@ def make_dlc_markers(save_file, n_time, n_markers):
     df.to_csv(save_file)
 
 
-def make_labels(save_file, n_time, n_labels, nan_frac=0):
+def make_labels(save_file, n_time, n_labels, nan_frac=0.0):
     file_ext = save_file.split('.')[-1]
     if file_ext == 'pkl':
         # pickle file structure for heuristic labels

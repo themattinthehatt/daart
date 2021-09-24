@@ -310,6 +310,7 @@ class Segmenter(BaseModel):
             - rng_seed_model (int): random seed to control weight initialization
             - input_size (int): number of input channels
             - output_size (int): number of classes
+            - batch_pad (int): padding needed to account for convolutions
             - n_hid_layers (int): hidden layers of network architecture
             - n_hid_units (int): hidden units per layer
             - n_lags (int): number of lags in input data to use for temporal convolution
@@ -336,7 +337,7 @@ class Segmenter(BaseModel):
         """Construct the model using hparams."""
 
         # set random seeds for control over model initialization
-        rng_seed_model = hparams.get('rng_seed_model', 0)
+        rng_seed_model = self.hparams.get('rng_seed_model', 0)
         torch.manual_seed(rng_seed_model)
         np.random.seed(rng_seed_model)
 
@@ -386,6 +387,8 @@ class Segmenter(BaseModel):
         """
         self.eval()
 
+        pad = self.hparams.get('batch_pad', 0)
+
         softmax = nn.Softmax(dim=1)
 
         # initialize container for labels
@@ -406,6 +409,10 @@ class Segmenter(BaseModel):
                 predictors = data['markers'][0]
                 # targets = data['labels'][0]
                 outputs_dict = self.model(predictors)
+                # remove padding if necessary
+                if pad > 0:
+                    for key, val in outputs_dict.items():
+                        outputs_dict[key] = val[pad:-pad] if val is not None else None
                 # push through log-softmax, since this is included in the loss and not model
                 labels[sess][data['batch_idx'].item()] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
@@ -444,15 +451,37 @@ class Segmenter(BaseModel):
         lambda_strong = self.hparams.get('lambda_strong', 0)
         lambda_pred = self.hparams.get('lambda_pred', 0)
 
+        # index padding for convolutions
+        pad = self.hparams.get('batch_pad', 0)
+
         # push data through model
-        markers = data['markers'][0]
-        outputs_dict = self.model(markers)
+        markers_wpad = data['markers'][0]
+        outputs_dict = self.model(markers_wpad)
 
         # get masks that define where strong labels are
         if lambda_strong > 0:
-            labels_strong = data['labels_strong'][0]
+            if pad > 0:
+                labels_strong = data['labels_strong'][0][pad:-pad]
+            else:
+                labels_strong = data['labels_strong'][0]
         else:
             labels_strong = None
+
+        if lambda_weak > 0:
+            if pad > 0:
+                labels_weak = data['labels_weak'][0][pad:-pad]
+            else:
+                labels_weak = data['labels_weak'][0]
+        else:
+            labels_weak = None
+
+        # remove padding from other tensors
+        if pad > 0:
+            markers = markers_wpad[pad:-pad]
+            for key, val in outputs_dict.items():
+                outputs_dict[key] = val[pad:-pad] if val is not None else None
+        else:
+            markers = markers_wpad
 
         # initialize loss to zero
         loss = 0
@@ -461,7 +490,6 @@ class Segmenter(BaseModel):
         # compute loss on weak labels
         # ------------------------------------
         if lambda_weak > 0:
-            labels_weak = data['labels_weak'][0]
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
                 loss_weak = self.class_loss(
@@ -553,6 +581,10 @@ class Ensembler(object):
                 labels_curr = []
                 for model in self.models:
                     outputs_dict = model(predictors)
+                    # remove padding if necessary
+                    if model.hparams.get('batch_pad', 0) > 0:
+                        for key, val in outputs_dict.items():
+                            outputs_dict[key] = val[pad:-pad] if val is not None else None
                     labels_tmp = outputs_dict['labels'].cpu().detach().numpy()
                     if combine_before_softmax:
                         labels_curr.append(labels_tmp[None, ...])

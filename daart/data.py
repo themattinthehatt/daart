@@ -90,7 +90,7 @@ def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0
     return batch_idxs
 
 
-def compute_batches(data, batch_size):
+def compute_batches(data, batch_size, batch_pad=0):
     """Compute batches of temporally contiguous data points.
 
     Partial batches are not constructed; for example, if the number of time points is 24, and the
@@ -102,6 +102,9 @@ def compute_batches(data, batch_size):
         data to batch, of shape (T, N) or (T,)
     batch_size : int
         number of continguous values along dimension 0 to include per batch
+    batch_pad : int, optional
+        if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
+        padding with convolution layers)
 
     Returns
     -------
@@ -115,16 +118,26 @@ def compute_batches(data, batch_size):
         return data
 
     if len(data.shape) == 2:
-        batch_dims = (batch_size, data.shape[1])
+        batch_dims = (batch_size + 2 * batch_pad, data.shape[1])
     else:
-        batch_dims = (batch_size,)
+        batch_dims = (batch_size + 2 * batch_pad,)
 
     n_batches = int(np.floor(data.shape[0] / batch_size))
-    batched_data = [np.nan * np.zeros(batch_dims) for _ in range(n_batches)]
+    batched_data = [np.zeros(batch_dims) for _ in range(n_batches)]
     for b in range(n_batches):
         idx_beg = b * batch_size
         idx_end = (b + 1) * batch_size
-        batched_data[b] = data[idx_beg:idx_end]
+        if batch_pad > 0:
+            if idx_beg == 0:
+                # initial vals are zeros; rest are real data
+                batched_data[b][batch_pad:] = data[idx_beg:idx_end + batch_pad]
+            elif (idx_end + batch_pad) > data.shape[0]:
+                batched_data[b][:-batch_pad] = data[idx_beg - batch_pad:idx_end]
+            else:
+                batched_data[b] = data[idx_beg - batch_pad:idx_end + batch_pad]
+        else:
+            batched_data[b] = data[idx_beg:idx_end]
+
     return batched_data
 
 
@@ -133,7 +146,7 @@ class SingleDataset(data.Dataset):
 
     def __init__(
             self, id, signals=None, transforms=None, paths=None, device='cuda', as_numpy=False,
-            batch_size=100):
+            batch_size=100, batch_pad=0):
         """
 
         Parameters
@@ -154,6 +167,9 @@ class SingleDataset(data.Dataset):
             'cpu' | 'cuda'
         batch_size : int, optional
             number of contiguous data points in each batch
+        batch_pad : int, optional
+            if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
+            padding with convolution layers)
 
         """
 
@@ -171,6 +187,7 @@ class SingleDataset(data.Dataset):
             self.paths[signal] = path
             self.dtypes[signal] = None  # update when loading data
 
+        self.batch_pad = batch_pad
         self.load_data(batch_size)
         self.n_trials = len(self.data[signals[0]])
 
@@ -303,7 +320,7 @@ class SingleDataset(data.Dataset):
                 data_curr = self.transforms[signal](data_curr)
 
             # compute batches of temporally contiguous data points
-            data_curr = compute_batches(data_curr, batch_size)
+            data_curr = compute_batches(data_curr, batch_size, self.batch_pad)
 
             self.data[signal] = data_curr
 
@@ -322,7 +339,7 @@ class DataGenerator(object):
     def __init__(
             self, ids_list, signals_list=None, transforms_list=None, paths_list=None,
             device='cuda', as_numpy=False, rng_seed=0, trial_splits=None, train_frac=1.0,
-            batch_size=100, num_workers=0, pin_memory=False):
+            batch_size=100, num_workers=0, pin_memory=False, batch_pad=0):
         """
 
         Parameters
@@ -355,6 +372,9 @@ class DataGenerator(object):
         pin_memory : bool, optional
             if True, the data loader automatically pulls fetched data Tensors in pinned memory, and
             thus enables faster transfer to CUDA-enabled GPUs
+        batch_pad : int, optional
+            if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
+            padding with convolution layers)
 
         """
         self.ids = ids_list
@@ -369,7 +389,7 @@ class DataGenerator(object):
                 ids_list, signals_list, transforms_list, paths_list):
             self.datasets.append(SingleDataset(
                 id=id, signals=signals, transforms=transforms, paths=paths, device=device,
-                as_numpy=self.as_numpy, batch_size=batch_size))
+                as_numpy=self.as_numpy, batch_size=batch_size, batch_pad=batch_pad))
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)

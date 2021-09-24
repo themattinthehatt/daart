@@ -1,4 +1,5 @@
-# import argparse
+"""Example script for fitting daart models from the command line with test-tube package."""
+
 import copy
 import numpy as np
 import os
@@ -10,17 +11,16 @@ import yaml
 
 from daart.data import DataGenerator
 from daart.eval import plot_training_curves
-from daart.io import export_expt_info_to_csv
-from daart.io import export_hparams
+from daart.io import export_expt_info_to_csv, export_hparams
 from daart.io import find_experiment
-from daart.io import get_expt_dir
-from daart.io import get_model_dir
-from daart.io import get_subdirs
+from daart.io import get_expt_dir, get_model_dir, get_subdirs
 from daart.models import Segmenter
 from daart.transforms import ZScore
+from daart.utils import compute_batch_pad
 
 
 def run_main(hparams, *args):
+
     if not isinstance(hparams, dict):
         hparams = vars(hparams)
 
@@ -69,11 +69,14 @@ def run_main(hparams, *args):
         transforms.append([ZScore(), None, None])
         paths.append([markers_file, labels_file, hand_labels_file])
 
+    # compute padding needed to account for convolutions
+    hparams['batch_pad'] = compute_batch_pad(hparams)
+
     # build data generator
     data_gen = DataGenerator(
         hparams['expt_ids'], signals, transforms, paths, device=hparams['device'],
         batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
-        train_frac=hparams['train_frac'])
+        train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'])
     print(data_gen)
 
     # -------------------------------------
