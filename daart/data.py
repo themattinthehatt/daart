@@ -296,7 +296,7 @@ class SingleDataset(data.Dataset):
 
             elif signal == 'labels_strong':
 
-                # assume output from deepethogram labeler
+                # assume csv output from deepethogram labeler
                 labels = np.genfromtxt(
                     self.paths[signal], delimiter=',', dtype=np.int, encoding=None)
                 labels = labels[1:, 1:]  # get rid of headers, etc.
@@ -305,9 +305,19 @@ class SingleDataset(data.Dataset):
 
             elif signal == 'labels_weak':
 
-                # assume particular pkl format
-                with open(self.paths[signal], 'rb') as f:
-                    data_curr = pickle.load(f)['states']
+                file_ext = self.paths[signal].split('.')[-1]
+
+                if file_ext == 'csv':
+                    # assume same format as strong label csv files
+                    labels = np.genfromtxt(
+                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None)
+                    labels = labels[1:, 1:]  # get rid of headers, etc.
+                    data_curr = np.argmax(labels, axis=1)
+                elif file_ext == 'pkl':
+                    # assume particular pkl format; already in dense representation
+                    with open(self.paths[signal], 'rb') as f:
+                        data_curr = pickle.load(f)['states']
+
                 self.dtypes[signal] = 'int32'
 
             else:
