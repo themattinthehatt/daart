@@ -48,6 +48,10 @@ class BaseModel(nn.Module):
         """Get all model parameters that have gradient updates turned on."""
         return filter(lambda p: p.requires_grad, self.parameters())
 
+    def load_parameters_from_file(self, filepath):
+        """Load parameters from .pt file."""
+        self.load_state_dict(torch.load(filepath, map_location=lambda storage, loc: storage))
+
     def fit(self, data_generator, save_path=None, **kwargs):
         """Fit pytorch models with stochastic gradient descent and early stopping.
 
