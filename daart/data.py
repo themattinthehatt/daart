@@ -300,7 +300,7 @@ class SingleDataset(data.Dataset):
                 labels = np.genfromtxt(
                     self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
                     skip_header=1)
-                data_curr = np.argmax(labels, axis=1)
+                data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
                 self.dtypes[signal] = 'int32'
 
             elif signal == 'labels_weak':
@@ -312,7 +312,7 @@ class SingleDataset(data.Dataset):
                     labels = np.genfromtxt(
                         self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
                         skip_header=1)
-                    data_curr = np.argmax(labels, axis=1)
+                    data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
                 elif file_ext == 'pkl':
                     # assume particular pkl format; already in dense representation
                     with open(self.paths[signal], 'rb') as f:
