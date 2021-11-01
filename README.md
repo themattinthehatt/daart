@@ -76,9 +76,7 @@ the standard file formats used by DLC/DGP are currently supported.
 `(T, n_classes + 1)`, where the first column represents the `background` class; the gradients 
 contributed by these time points are zeroed out during training.
 
-* heuristic labels: `data_dir/labels-heuristic/[expt_id]_labels.pkl`; a dictionary that contains
-the heuristic labels; the key `states` must index an array of shape `(T,)` that 
-contains the single discrete state assigned to each time point; `0` corresponds to background 
-class.
+* heuristic labels: `data_dir/labels-heuristic/[expt_id]_labels.csv`; same format as the hand 
+labels
 
 See the directory `daart/data` for example fly data used in the preprint.
