@@ -298,8 +298,8 @@ class SingleDataset(data.Dataset):
 
                 # assume csv output from deepethogram labeler
                 labels = np.genfromtxt(
-                    self.paths[signal], delimiter=',', dtype=np.int, encoding=None)
-                labels = labels[1:, 1:]  # get rid of headers, etc.
+                    self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
+                    skip_header=1)
                 data_curr = np.argmax(labels, axis=1)
                 self.dtypes[signal] = 'int32'
 
@@ -310,8 +310,8 @@ class SingleDataset(data.Dataset):
                 if file_ext == 'csv':
                     # assume same format as strong label csv files
                     labels = np.genfromtxt(
-                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None)
-                    labels = labels[1:, 1:]  # get rid of headers, etc.
+                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
+                        skip_header=1)
                     data_curr = np.argmax(labels, axis=1)
                 elif file_ext == 'pkl':
                     # assume particular pkl format; already in dense representation
