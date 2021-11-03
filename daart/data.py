@@ -296,11 +296,20 @@ class SingleDataset(data.Dataset):
 
             elif signal == 'labels_strong':
 
-                # assume csv output from deepethogram labeler
-                labels = np.genfromtxt(
-                    self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
-                    skip_header=1)
-                data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
+                if self.paths[signal] is None:
+                    # if no path given, assume same size as weak labels and set all to background
+                    if 'labels_weak' in self.data.keys():
+                        data_curr = np.zeros(
+                            (len(self.data['labels_weak']) * batch_size,), dtype=np.int)
+                    else:
+                        raise FileNotFoundError(
+                            'Could not load "labels_strong" from None file without weak labels')
+                else:
+                    # assume csv output from deepethogram labeler
+                    labels = np.genfromtxt(
+                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
+                        skip_header=1)
+                    data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
                 self.dtypes[signal] = 'int32'
 
             elif signal == 'labels_weak':
