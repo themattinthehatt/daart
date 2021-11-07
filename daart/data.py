@@ -146,7 +146,7 @@ class SingleDataset(data.Dataset):
 
     def __init__(
             self, id, signals=None, transforms=None, paths=None, device='cuda', as_numpy=False,
-            batch_size=100, batch_pad=0):
+            batch_size=100, batch_pad=0, input_type='markers'):
         """
 
         Parameters
@@ -170,6 +170,8 @@ class SingleDataset(data.Dataset):
         batch_pad : int, optional
             if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
             padding with convolution layers)
+        input_type : str, optional
+            'markers' | 'features'
 
         """
 
@@ -188,7 +190,7 @@ class SingleDataset(data.Dataset):
             self.dtypes[signal] = None  # update when loading data
 
         self.batch_pad = batch_pad
-        self.load_data(batch_size)
+        self.load_data(batch_size, input_type)
         self.n_trials = len(self.data[signals[0]])
 
         # meta data about train/test/xv splits; set by DataGenerator
@@ -245,13 +247,15 @@ class SingleDataset(data.Dataset):
 
         return sample
 
-    def load_data(self, batch_size):
+    def load_data(self, batch_size, input_type):
         """Load all data into memory.
 
         Parameters
         ----------
         batch_size : int
             batch size of data
+        input_type : str, optional
+            'markers' | 'features'
 
         Returns
         -------
@@ -269,25 +273,46 @@ class SingleDataset(data.Dataset):
                 file_ext = self.paths[signal].split('.')[-1]
 
                 if file_ext == 'csv':
-                    # assume dlc/dgp format
-                    from numpy import genfromtxt
-                    dlc = genfromtxt(
-                        self.paths[signal], delimiter=',', dtype=None, encoding=None)
-                    dlc = dlc[3:, 1:].astype('float')  # get rid of headers, etc.
-                    x = dlc[:, 0::3]
-                    y = dlc[:, 1::3]
-                    data_curr = np.hstack([x, y])
+
+                    if input_type == 'markers':
+                        # assume dlc/dgp format
+
+                        # from numpy import genfromtxt
+                        # markers = genfromtxt(
+                        #     self.paths[signal], delimiter=',', dtype=None, encoding=None)
+                        # markers = dlc[3:, 1:].astype('float')  # get rid of headers, etc.
+
+                        # drop first column ('scorer' at level 0) which just contains frame indices
+                        df = pd.read_csv(
+                            self.paths[signal], header=[0, 1, 2]).drop(['scorer'], axis=1, level=0)
+                        markers = df.values
+                        x = markers[:, 0::3]
+                        y = markers[:, 1::3]
+                        data_curr = np.hstack([x, y])
+
+                    else:
+                        # assume csv with single header row
+                        df = pd.read_csv(self.paths[signal]).drop(['Unnamed: 0'], axis=1)
+                        data_curr = df.values
+
                 elif file_ext == 'h5':
+
+                    if input_type != 'markers':
+                        raise NotImplementedError
+
                     # assume dlc/dgp format
                     with h5py.File(self.paths[signal], 'r') as f:
                         t = f['df_with_missing']['table'][()]
-                    dlc = np.concatenate([t[i][1][None, :] for i in range(len(t))])
-                    x = dlc[:, 0::3]
-                    y = dlc[:, 1::3]
+                    markers = np.concatenate([t[i][1][None, :] for i in range(len(t))])
+                    x = markers[:, 0::3]
+                    y = markers[:, 1::3]
                     data_curr = np.hstack([x, y])
+
                 elif file_ext == 'npy':
+
                     # assume single array
                     data_curr = np.load(self.paths[signal])
+
                 else:
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
 
@@ -296,7 +321,7 @@ class SingleDataset(data.Dataset):
 
             elif signal == 'labels_strong':
 
-                if self.paths[signal] is None:
+                if (self.paths[signal] is None) or not os.path.exists(self.paths[signal]):
                     # if no path given, assume same size as weak labels and set all to background
                     if 'labels_weak' in self.data.keys():
                         data_curr = np.zeros(
@@ -358,7 +383,7 @@ class DataGenerator(object):
     def __init__(
             self, ids_list, signals_list=None, transforms_list=None, paths_list=None,
             device='cuda', as_numpy=False, rng_seed=0, trial_splits=None, train_frac=1.0,
-            batch_size=100, num_workers=0, pin_memory=False, batch_pad=0):
+            batch_size=100, num_workers=0, pin_memory=False, batch_pad=0, input_type='markers'):
         """
 
         Parameters
@@ -394,6 +419,8 @@ class DataGenerator(object):
         batch_pad : int, optional
             if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
             padding with convolution layers)
+        input_type : str, optional
+            'markers' | 'features'
 
         """
         self.ids = ids_list
@@ -408,7 +435,8 @@ class DataGenerator(object):
                 ids_list, signals_list, transforms_list, paths_list):
             self.datasets.append(SingleDataset(
                 id=id, signals=signals, transforms=transforms, paths=paths, device=device,
-                as_numpy=self.as_numpy, batch_size=batch_size, batch_pad=batch_pad))
+                as_numpy=self.as_numpy, batch_size=batch_size, batch_pad=batch_pad,
+                input_type=input_type))
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
