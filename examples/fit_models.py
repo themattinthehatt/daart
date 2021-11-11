@@ -58,7 +58,7 @@ def run_main(hparams, *args):
 
         # heuristic labels
         labels_file = os.path.join(
-            hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.pkl')
+            hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
 
         # hand labels
         hand_labels_file = os.path.join(
