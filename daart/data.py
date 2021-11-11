@@ -301,9 +301,12 @@ class SingleDataset(data.Dataset):
                         raise NotImplementedError
 
                     # assume dlc/dgp format
-                    with h5py.File(self.paths[signal], 'r') as f:
-                        t = f['df_with_missing']['table'][()]
-                    markers = np.concatenate([t[i][1][None, :] for i in range(len(t))])
+                    # with h5py.File(self.paths[signal], 'r') as f:
+                    #     t = f['df_with_missing']['table'][()]
+                    # markers = np.concatenate([t[i][1][None, :] for i in range(len(t))])
+
+                    df = pd.read_hdf(self.paths[signal])
+                    markers = df.to_numpy()
                     x = markers[:, 0::3]
                     y = markers[:, 1::3]
                     data_curr = np.hstack([x, y])
