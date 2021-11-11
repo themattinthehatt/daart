@@ -20,9 +20,10 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
         entries should be in [0, K-1] where K is the number of classes
     pred_classes : array-like
         entries should be in [0, K-1] where K is the number of classes
-    background : int
+    background : int or NoneType
         defines the background class that identifies points with no supervised label; these time
-        points are omitted from the precision and recall calculations
+        points are omitted from the precision and recall calculations; if NoneType, no background
+        class is utilized
     n_classes : int, optional
         total number of non-background classes; if NoneType, will be inferred from true classes
 
@@ -35,19 +36,29 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
     """
 
     assert true_classes.shape[0] == pred_classes.shape[0]
-    assert background == 0  # need to generalize
 
     # find all data points that are not background
-    obs_idxs = np.where(true_classes != background)[0]
+    if background is not None:
+        assert background == 0  # need to generalize
+        obs_idxs = np.where(true_classes != background)[0]
+    else:
+        obs_idxs = np.arange(true_classes.shape[0])
+
     if n_classes is None:
         n_classes = len(np.unique(true_classes[obs_idxs]))
 
+    # set of labels to include in metric computations
+    if background is not None:
+        labels = np.arange(1, n_classes + 1)
+    else:
+        labels = np.arange(n_classes)
+
     precision = precision_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=np.arange(1, n_classes + 1), average=None, zero_division=0)
+        labels=labels, average=None, zero_division=0)
     recall = recall_score(
         true_classes[obs_idxs], pred_classes[obs_idxs],
-        labels=np.arange(1, n_classes + 1), average=None, zero_division=0)
+        labels=labels, average=None, zero_division=0)
 
     # replace 0s with NaNs for classes with no ground truth
     for n in range(precision.shape[0]):
