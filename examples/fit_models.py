@@ -51,10 +51,15 @@ def run_main(hparams, *args):
 
     for expt_id in hparams['expt_ids']:
 
-        # DLC markers
-        markers_file = os.path.join(hparams['data_dir'], 'markers', expt_id + '_labeled.h5')
+        # DLC markers or features (i.e. from simba)
+        input_type = hparams.get('input_type', 'markers')
+        markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.h5')
         if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], 'markers', expt_id + '_labeled.csv')
+            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.csv')
+        if not os.path.exists(markers_file):
+            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.npy')
+        if not os.path.exists(markers_file):
+            raise FileNotFoundError('could not find marker file for %s' % expt_id)
 
         # heuristic labels
         labels_file = os.path.join(
@@ -78,6 +83,9 @@ def run_main(hparams, *args):
         batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
         train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'])
     print(data_gen)
+
+    # automatically compute input/output sizes from data
+    hparams['input_size'] = data_gen.datasets[0].data['markers'][0].shape[1]
 
     # -------------------------------------
     # build model

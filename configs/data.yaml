@@ -1,5 +1,5 @@
-# number of labels
-input_size: 16
+# name of directory containing input data: 'markers' | 'features' | ...
+input_type: markers
 
 # number of classes (including background)
 output_size: 6
