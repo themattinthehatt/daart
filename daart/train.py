@@ -5,6 +5,8 @@ import os
 import numpy as np
 import pandas as pd
 import torch
+from typing import List, Optional, Union
+from typeguard import typechecked
 
 from daart.io import make_dir_if_not_exists
 
@@ -19,7 +21,8 @@ class Logger(object):
     well as dataset-specific metrics for easier downstream plotting.
     """
 
-    def __init__(self, n_datasets=1, save_path=None):
+    @typechecked
+    def __init__(self, n_datasets: int = 1, save_path: Optional[str] = None) -> None:
         """
 
         Parameters
@@ -55,7 +58,8 @@ class Logger(object):
         # store all metrics in a list for easy saving
         self.all_metrics_list = []
 
-    def reset_metrics(self, dtype):
+    @typechecked
+    def reset_metrics(self, dtype: str):
         """Reset all metrics.
 
         Parameters
@@ -72,7 +76,13 @@ class Logger(object):
             for key in m[dtype].keys():
                 m[dtype][key] = 0
 
-    def update_metrics(self, dtype, loss_dict, dataset=None):
+    @typechecked
+    def update_metrics(
+            self,
+            dtype: str,
+            loss_dict: dict,
+            dataset: Union[int, np.int64, None] = None
+    ) -> None:
         """Update metrics for a specific dtype/dataset.
 
         Parameters
@@ -103,8 +113,17 @@ class Logger(object):
                     self.metrics_by_dataset[dataset][dtype][key] = 0
                 self.metrics_by_dataset[dataset][dtype][key] += val
 
+    @typechecked
     def create_metric_row(
-            self, dtype, epoch, batch, dataset, trial, best_epoch=None, by_dataset=False):
+            self,
+            dtype: str,
+            epoch: Union[int, np.int64],
+            batch: Union[int, np.int64],
+            dataset: Union[int, np.int64],
+            trial: Union[int, np.int64, None],
+            best_epoch: Optional[Union[int, np.int64]] = None,
+            by_dataset: bool = False
+    ) -> dict:
         """Export metrics and other data (e.g. epoch) for logging train progress.
 
         Parameters
@@ -174,13 +193,18 @@ class Logger(object):
 
         return metric_row
 
-    def get_loss(self, dtype):
+    @typechecked
+    def get_loss(self, dtype: str) -> float:
         """Return loss aggregated over all datasets.
 
         Parameters
         ----------
         dtype : str
             datatype to calculate loss for (e.g. 'train', 'val', 'test')
+
+        Returns
+        -------
+        float
 
         """
         return self.metrics[dtype]['loss'] / self.metrics[dtype]['batches']
@@ -192,7 +216,8 @@ class EarlyStopping(object):
     Adapted from: https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
     """
 
-    def __init__(self, patience=10, min_epochs=10, delta=0):
+    @typechecked
+    def __init__(self, patience: int = 10, min_epochs: int = 10, delta: float = 0.) -> None:
         """
 
         Parameters
@@ -216,7 +241,8 @@ class EarlyStopping(object):
         self.stopped_epoch = 0
         self.should_stop = False
 
-    def on_val_check(self, epoch, curr_loss):
+    @typechecked
+    def on_val_check(self, epoch: Union[int, np.int64], curr_loss: float) -> None:
         """Check to see if loss has begun to increase on validation data for current epoch.
 
         Rather than returning the results of the check, this method updates the class attribute

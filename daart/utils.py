@@ -1,11 +1,14 @@
 """Utility functions for daart package."""
 
+from typeguard import typechecked
+
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['compute_batch_pad']
 
 
-def compute_batch_pad(hparams):
+@typechecked
+def compute_batch_pad(hparams: dict) -> int:
     """Compute padding needed to account for convolutions.
 
     Parameters

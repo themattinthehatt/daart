@@ -4,9 +4,12 @@ import csv
 import numpy as np
 import os
 import pickle
+from typing import List, Optional, Union
+from typeguard import typechecked
 
 
-def get_subdirs(path):
+@typechecked
+def get_subdirs(path: str) -> List[str]:
     """Get all first-level subdirectories in a given path (no recursion).
 
     Parameters
@@ -31,7 +34,24 @@ def get_subdirs(path):
     return s
 
 
-def get_expt_dir(base_dir, expt_ids):
+@typechecked
+def get_expt_dir(base_dir: str, expt_ids: Union[str, List[str]]) -> str:
+    """Construct experiment directory given base directory and list of experiment ids.
+
+    Parameters
+    ----------
+    base_dir : str
+        base results directory
+    expt_ids : str or list
+        single experiment id (str) of a list of experiment ids that will define a "multisession"
+        directory
+
+    Returns
+    -------
+    str
+        absolute path of experiment directory
+
+    """
     if isinstance(expt_ids, list) and len(expt_ids) > 1:
         # multisession; see if multisession already exists; if not, create a new one
         try:
@@ -65,12 +85,29 @@ def get_expt_dir(base_dir, expt_ids):
     return os.path.join(base_dir, expt_dir)
 
 
-def get_model_dir(base_dir, model_params):
+@typechecked
+def get_model_dir(base_dir: str, model_params: dict) -> str:
+    """Helper function to construct model directory from model param dict.
+
+    Parameters
+    ----------
+    base_dir : str
+        base results directory
+    model_params : dict
+        should contain the keys `model_type` and optionally `experiment_name`
+
+    Returns
+    -------
+    str
+        absolute path of model directory
+
+    """
     model_dir = model_params['model_type']
     return os.path.join(base_dir, model_dir, model_params.get('experiment_name', ''))
 
 
-def get_model_params(hparams):
+@typechecked
+def get_model_params(hparams: dict) -> dict:
     """Returns dict containing all params considered essential for defining a model of that type.
 
     Parameters
@@ -132,7 +169,8 @@ def get_model_params(hparams):
     return hparams_less
 
 
-def find_experiment(hparams, verbose=False):
+@typechecked
+def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
     """Search testtube versions to find if experiment with the same hyperparameters has been fit.
 
     Parameters
@@ -200,7 +238,8 @@ def find_experiment(hparams, verbose=False):
         return None
 
 
-def read_expt_info_from_csv(expt_file):
+@typechecked
+def read_expt_info_from_csv(expt_file: str) -> List[dict]:
     """Read csv file that contains expt id info.
 
     Parameters
@@ -211,7 +250,7 @@ def read_expt_info_from_csv(expt_file):
     Returns
     -------
     list
-        list of expts
+        list of dicts with expt info
 
     """
     expts_multi = []
@@ -223,7 +262,8 @@ def read_expt_info_from_csv(expt_file):
     return expts_multi
 
 
-def export_expt_info_to_csv(expt_dir, ids_list):
+@typechecked
+def export_expt_info_to_csv(expt_dir: str, ids_list: List[str]) -> None:
     """Export list of expt ids to csv file.
 
     Parameters
@@ -244,7 +284,8 @@ def export_expt_info_to_csv(expt_dir, ids_list):
             expt_writer.writerow({'expt': id})
 
 
-def export_hparams(hparams, filename=None):
+@typechecked
+def export_hparams(hparams: dict, filename: Optional[str] = None) -> None:
     """Export hyperparameter dictionary as a pickle file.
 
     Parameters
@@ -262,7 +303,8 @@ def export_hparams(hparams, filename=None):
         pickle.dump(hparams, f)
 
 
-def make_dir_if_not_exists(save_file):
+@typechecked
+def make_dir_if_not_exists(save_file: str) -> None:
     """Utility function for creating necessary dictories for a specified filename.
 
     Parameters

@@ -7,11 +7,19 @@ import os
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import recall_score, precision_score
+from typeguard import typechecked
+from typing import List, Optional, Union
 
 from daart.io import make_dir_if_not_exists
 
 
-def get_precision_recall(true_classes, pred_classes, background=0, n_classes=None):
+@typechecked
+def get_precision_recall(
+        true_classes: np.ndarray,
+        pred_classes: np.ndarray,
+        background: Union[int, None] = 0,
+        n_classes: Optional[int] = None
+) -> dict:
     """Compute precision and recall for classifier.
 
     Parameters
@@ -73,7 +81,8 @@ def get_precision_recall(true_classes, pred_classes, background=0, n_classes=Non
     return {'precision': p, 'recall': r, 'f1': f1}
 
 
-def int_over_union(array1, array2):
+@typechecked
+def int_over_union(array1: np.ndarray, array2: np.ndarray) -> dict:
     """Compute intersection over union for two 1D arrays.
 
     Parameters
@@ -98,7 +107,8 @@ def int_over_union(array1, array2):
     return iou
 
 
-def run_lengths(array):
+@typechecked
+def run_lengths(array: np.ndarray) -> dict:
     """Compute distribution of run lengths for an array with integer entries.
 
     Parameters
@@ -125,8 +135,14 @@ def run_lengths(array):
     return seqs
 
 
+@typechecked
 def plot_training_curves(
-        metrics_file, dtype='val', expt_ids=None, save_file=None, format='pdf'):
+        metrics_file: str,
+        dtype: str = 'val',
+        expt_ids: Optional[list] = None,
+        save_file: Optional[str] = None,
+        format: str = 'pdf'
+) -> None:
     """Create training plots for each term in the objective function.
 
     The `dtype` argument controls which type of trials are plotted ('train' or 'val').
@@ -161,8 +177,7 @@ def plot_training_curves(
 
     metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'fc']
 
-    metrics_dfs = []
-    metrics_dfs.append(load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids))
+    metrics_dfs = [load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids)]
     metrics_df = pd.concat(metrics_dfs, sort=False)
 
     if isinstance(expt_ids, list) and len(expt_ids) > 1:
@@ -185,7 +200,13 @@ def plot_training_curves(
     plt.close()
 
 
-def load_metrics_csv_as_df(metric_file, metrics_list, expt_ids=None, test=False):
+@typechecked
+def load_metrics_csv_as_df(
+        metric_file: str,
+        metrics_list: List[str],
+        expt_ids: Optional[List[str]] = None,
+        test: bool = False
+) -> pd.DataFrame:
     """Load metrics csv file and return as a pandas dataframe for easy plotting.
 
     Parameters
@@ -196,7 +217,7 @@ def load_metrics_csv_as_df(metric_file, metrics_list, expt_ids=None, test=False)
         names of metrics to pull from csv; do not prepend with 'tr', 'val', or 'test'
     expt_ids : list, optional
         dataset names for easier parsing
-    test : bool
+    test : bool, optional
         True to only return test values (computed once at end of training)
 
     Returns

@@ -21,12 +21,22 @@ import pickle
 import torch
 from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
+from typing import List, Optional, Union
+from typeguard import typechecked
 
 
 __all__ = ['split_trials', 'compute_batches', 'SingleDataset', 'DataGenerator']
 
 
-def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0):
+@typechecked
+def split_trials(
+        n_trials: int,
+        rng_seed: int = 0,
+        train_tr: int = 8,
+        val_tr: int = 1,
+        test_tr: int = 1,
+        gap_tr: int = 0
+) -> dict:
     """Split trials into train/val/test blocks.
 
     The data is split into blocks that have gap trials between tr/val/test:
@@ -90,7 +100,12 @@ def split_trials(n_trials, rng_seed=0, train_tr=8, val_tr=1, test_tr=1, gap_tr=0
     return batch_idxs
 
 
-def compute_batches(data, batch_size, batch_pad=0):
+@typechecked
+def compute_batches(
+        data: Union[np.ndarray, list],
+        batch_size: int,
+        batch_pad: int = 0
+) -> list:
     """Compute batches of temporally contiguous data points.
 
     Partial batches are not constructed; for example, if the number of time points is 24, and the
@@ -98,7 +113,7 @@ def compute_batches(data, batch_size, batch_pad=0):
 
     Parameters
     ----------
-    data : array-like
+    data : array-like or list
         data to batch, of shape (T, N) or (T,)
     batch_size : int
         number of continguous values along dimension 0 to include per batch
@@ -144,9 +159,19 @@ def compute_batches(data, batch_size, batch_pad=0):
 class SingleDataset(data.Dataset):
     """Dataset class for a single dataset."""
 
+    @typechecked
     def __init__(
-            self, id, signals=None, transforms=None, paths=None, device='cuda', as_numpy=False,
-            batch_size=100, batch_pad=0, input_type='markers'):
+            self,
+            id: str,
+            signals: List[str],
+            transforms: list,
+            paths: List[Union[str, None]],
+            device: str = 'cuda',
+            as_numpy: bool = False,
+            batch_size: int = 100,
+            batch_pad: int = 0,
+            input_type: str = 'markers'
+    ) -> None:
         """
 
         Parameters
@@ -200,7 +225,8 @@ class SingleDataset(data.Dataset):
         self.device = device
         self.as_numpy = as_numpy
 
-    def __str__(self):
+    @typechecked
+    def __str__(self) -> str:
         """Pretty printing of dataset info"""
         format_str = str('%s\n' % self.id)
         format_str += str('    signals: {}\n'.format(self.signals))
@@ -208,10 +234,12 @@ class SingleDataset(data.Dataset):
         format_str += str('    paths: {}\n'.format(self.paths))
         return format_str
 
-    def __len__(self):
+    @typechecked
+    def __len__(self) -> int:
         return self.n_trials
 
-    def __getitem__(self, idx):
+    @typechecked
+    def __getitem__(self, idx: Union[int, np.int64, None]) -> dict:
         """Return batch of data.
 
         Parameters
@@ -247,20 +275,16 @@ class SingleDataset(data.Dataset):
 
         return sample
 
-    def load_data(self, batch_size, input_type):
+    @typechecked
+    def load_data(self, batch_size: int, input_type: str) -> None:
         """Load all data into memory.
 
         Parameters
         ----------
         batch_size : int
             batch size of data
-        input_type : str, optional
+        input_type : str
             'markers' | 'features'
-
-        Returns
-        -------
-        dict
-            data samples
 
         """
 
@@ -371,8 +395,6 @@ class SingleDataset(data.Dataset):
 
             self.data[signal] = data_curr
 
-        return None
-
 
 class DataGenerator(object):
     """Dataset generator for serving pytorch models.
@@ -383,10 +405,24 @@ class DataGenerator(object):
 
     _dtypes = {'train', 'val', 'test'}
 
+    @typechecked
     def __init__(
-            self, ids_list, signals_list=None, transforms_list=None, paths_list=None,
-            device='cuda', as_numpy=False, rng_seed=0, trial_splits=None, train_frac=1.0,
-            batch_size=100, num_workers=0, pin_memory=False, batch_pad=0, input_type='markers'):
+            self,
+            ids_list: List[str],
+            signals_list: List[List[str]],
+            transforms_list: List[list],
+            paths_list: List[List[Union[str, None]]],
+            device: str = 'cuda',
+            as_numpy: bool = False,
+            rng_seed: int = 0,
+            trial_splits: Union[str, None] = None,
+            train_frac: float = 1.0,
+            batch_size: int = 100,
+            num_workers: int = 0,
+            pin_memory: bool = False,
+            batch_pad: int = 0,
+            input_type: str = 'markers'
+    ) -> None:
         """
 
         Parameters
@@ -505,17 +541,20 @@ class DataGenerator(object):
             for dtype in self._dtypes:
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
-    def __str__(self):
+    @typechecked
+    def __str__(self) -> str:
         """Pretty printing of dataset info"""
         format_str = str('Generator contains %i SingleDataset objects:\n' % self.n_datasets)
         for dataset in self.datasets:
             format_str += dataset.__str__()
         return format_str
 
-    def __len__(self):
+    @typechecked
+    def __len__(self) -> int:
         return self.n_datasets
 
-    def reset_iterators(self, dtype):
+    @typechecked
+    def reset_iterators(self, dtype: str) -> None:
         """Reset iterators so that all data is available.
 
         Parameters
@@ -532,7 +571,8 @@ class DataGenerator(object):
             else:
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
-    def next_batch(self, dtype):
+    @typechecked
+    def next_batch(self, dtype: str) -> tuple:
         """Return next batch of data.
 
         The data generator iterates randomly through datasets and trials. Once a dataset runs out
