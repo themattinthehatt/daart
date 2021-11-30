@@ -6,6 +6,7 @@ import os
 import pickle
 from typing import List, Optional, Union
 from typeguard import typechecked
+import yaml
 
 
 @typechecked
@@ -163,6 +164,10 @@ def get_model_params(hparams: dict) -> dict:
         hparams_less['l2_reg'] = hparams['l2_reg']
         if model_type == 'dtcn':
             hparams_less['dropout'] = hparams['dropout']
+    elif model_type == 'random-forest':
+        hparams_less.pop('lambda_weak')
+        hparams_less.pop('lambda_strong')
+        hparams_less.pop('lambda_pred')
     else:
         raise NotImplementedError('"%s" is not a valid model type' % model_type)
 
@@ -211,10 +216,16 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
     version = None
     for version in tt_versions:
         # load hparams
-        version_file = os.path.join(tt_expt_dir, version, 'hparams.pkl')
         try:
-            with open(version_file, 'rb') as f:
-                hparams_ = pickle.load(f)
+            try:
+                version_file = os.path.join(tt_expt_dir, version, 'hparams.pkl')
+                with open(version_file, 'rb') as f:
+                    hparams_ = pickle.load(f)
+            except FileNotFoundError:
+                version_file = os.path.join(tt_expt_dir, version, 'hparams.yaml')
+                with open(version_file, 'r') as f:
+                    hparams_ = yaml.safe_load(f)
+
             if all([hparams_[key] == hparams_less[key] for key in hparams_less.keys()]):
                 # found match - did it finish training?
                 if hparams_['training_completed']:
@@ -286,7 +297,7 @@ def export_expt_info_to_csv(expt_dir: str, ids_list: List[str]) -> None:
 
 @typechecked
 def export_hparams(hparams: dict, filename: Optional[str] = None) -> None:
-    """Export hyperparameter dictionary as a pickle file.
+    """Export hyperparameter dictionary as a yaml file.
 
     Parameters
     ----------
@@ -297,10 +308,10 @@ def export_hparams(hparams: dict, filename: Optional[str] = None) -> None:
 
     """
     if filename is None:
-        filename = os.path.join(hparams['tt_version_dir'], 'hparams.pkl')
+        filename = os.path.join(hparams['tt_version_dir'], 'hparams.yaml')
 
-    with open(filename, 'wb') as f:
-        pickle.dump(hparams, f)
+    with open(filename, 'w') as f:
+        yaml.dump(hparams, f)
 
 
 @typechecked
