@@ -15,6 +15,7 @@ from daart.io import export_expt_info_to_csv, export_hparams
 from daart.io import find_experiment
 from daart.io import get_expt_dir, get_model_dir, get_subdirs
 from daart.models import Segmenter
+from daart.train import Trainer
 from daart.transforms import ZScore
 from daart.utils import compute_batch_pad
 
@@ -85,7 +86,15 @@ def run_main(hparams, *args):
     print(data_gen)
 
     # automatically compute input/output sizes from data
-    hparams['input_size'] = data_gen.datasets[0].data['markers'][0].shape[1]
+    input_size = 0
+    for batch in data_gen.datasets[0].data['markers']:
+        print(batch.shape)
+        if batch.shape[1] == 0:
+            continue
+        else:
+            input_size = batch.shape[1]
+            break
+    hparams['input_size'] = input_size
 
     # -------------------------------------
     # build model
@@ -98,7 +107,8 @@ def run_main(hparams, *args):
     # -------------------------------------
     # train model
     # -------------------------------------
-    model.fit(data_gen, save_path=model_save_path, **hparams)
+    trainer = Trainer(**hparams)
+    trainer.fit(model, data_gen, save_path=model_save_path)
 
     # update hparams upon successful training
     hparams['training_completed'] = True

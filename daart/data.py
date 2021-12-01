@@ -7,8 +7,8 @@ of trials, which are split into training, validation, and testing trials using t
 :func:`split_trials`. The default data generator can handle the following data types:
 
 * **markers**: i.e. DLC/DGP markers
-* **labels**: discrete behavioral labels
-* **soft_labels**: noisy discrete behavioral labels
+* **labels_strong**: discrete behavioral labels
+* **labels_weak**: noisy discrete behavioral labels
 
 """
 
@@ -301,11 +301,6 @@ class SingleDataset(data.Dataset):
                     if input_type == 'markers':
                         # assume dlc/dgp format
 
-                        # from numpy import genfromtxt
-                        # markers = genfromtxt(
-                        #     self.paths[signal], delimiter=',', dtype=None, encoding=None)
-                        # markers = dlc[3:, 1:].astype('float')  # get rid of headers, etc.
-
                         # drop first column ('scorer' at level 0) which just contains frame indices
                         df = pd.read_csv(
                             self.paths[signal], header=[0, 1, 2]).drop(['scorer'], axis=1, level=0)
@@ -313,6 +308,7 @@ class SingleDataset(data.Dataset):
                         x = markers[:, 0::3]
                         y = markers[:, 1::3]
                         data_curr = np.hstack([x, y])
+                        print(df)
 
                     else:
                         # assume csv with single header row
@@ -325,10 +321,6 @@ class SingleDataset(data.Dataset):
                         raise NotImplementedError
 
                     # assume dlc/dgp format
-                    # with h5py.File(self.paths[signal], 'r') as f:
-                    #     t = f['df_with_missing']['table'][()]
-                    # markers = np.concatenate([t[i][1][None, :] for i in range(len(t))])
-
                     df = pd.read_hdf(self.paths[signal])
                     markers = df.to_numpy()
                     x = markers[:, 0::3]
@@ -415,7 +407,7 @@ class DataGenerator(object):
             device: str = 'cuda',
             as_numpy: bool = False,
             rng_seed: int = 0,
-            trial_splits: Union[str, None] = None,
+            trial_splits: Union[str, dict, None] = None,
             train_frac: float = 1.0,
             batch_size: int = 100,
             num_workers: int = 0,

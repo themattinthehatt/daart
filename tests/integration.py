@@ -58,7 +58,7 @@ def make_tmp_data(data_dir):
         make_dlc_markers(marker_file, TEMP_DATA['n_time'], TEMP_DATA['n_markers'])
 
         # heuristic labels
-        labels_file = os.path.join(data_dir, 'labels-heuristic', session + '_labels.pkl')
+        labels_file = os.path.join(data_dir, 'labels-heuristic', session + '_labels.csv')
         file_dir = os.path.dirname(labels_file)
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
@@ -80,7 +80,7 @@ def make_dlc_markers(save_file, n_time, n_markers):
     data[:, 2::3] = 0.5
 
     pdindex = pd.MultiIndex.from_product(
-        [['scorer'], ['marker_%i' % i for i in range(n_markers)], ['x', 'y', 'likelihood']],
+        [['scorer_'], ['marker_%i' % i for i in range(n_markers)], ['x', 'y', 'likelihood']],
         names=['scorer', 'bodyparts', 'coords'])
 
     imagenames = np.arange(n_time)
@@ -115,7 +115,6 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
 
     # data vals
     data_dict = {
-        'input_size': 2 * TEMP_DATA['n_markers'],
         'output_size': TEMP_DATA['n_labels'] + 1,
         'expt_ids': sessions,
         'data_dir': base_dir,
@@ -149,7 +148,7 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
             'model': {
                 'tt_experiment_name': expt_name,
                 'model_type': model,
-                'n_lags': 2,
+                'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred},
@@ -160,7 +159,7 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
             'model': {
                 'tt_experiment_name': expt_name,
                 'model_type': model,
-                'n_lags': 2,
+                'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
@@ -173,7 +172,7 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
                 'tt_experiment_name': expt_name,
                 'model_type': model,
                 'n_hid_layers': 2,
-                'n_lags': 2,
+                'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
