@@ -28,6 +28,18 @@ class BaseModel(nn.Module):
         """Build model from hparams."""
         raise NotImplementedError
 
+    @staticmethod
+    def _build_linear(self, global_layer_num, name, in_size, out_size):
+
+        linear_layer = nn.Sequential()
+
+        # add layer (cross entropy loss handles activation)
+        layer = nn.Linear(in_features=in_size, out_features=out_size)
+        layer_name = str('dense(%s)_layer_%02i' % (name, global_layer_num))
+        linear_layer.add_module(layer_name, layer)
+
+        return linear_layer
+
     def forward(self, *args, **kwargs):
         """Push data through model."""
         raise NotImplementedError
@@ -62,6 +74,7 @@ class Segmenter(BaseModel):
             - rng_seed_model (int): random seed to control weight initialization
             - input_size (int): number of input channels
             - output_size (int): number of classes
+            - task_size (int): number of regression tasks
             - batch_pad (int): padding needed to account for convolutions
             - n_hid_layers (int): hidden layers of network architecture
             - n_hid_units (int): hidden units per layer
@@ -70,6 +83,7 @@ class Segmenter(BaseModel):
             - lambda_weak (float): hyperparam on weak label classification
             - lambda_strong (float): hyperparam on srong label classification
             - lambda_pred (float): hyperparam on next step prediction
+            - lambda_task (float): hyperparam on task regression
 
         """
         super().__init__()
@@ -80,6 +94,7 @@ class Segmenter(BaseModel):
         # label loss based on cross entropy; don't compute gradient when target = 0
         self.class_loss = nn.CrossEntropyLoss(ignore_index=0, reduction='mean')
         self.pred_loss = nn.MSELoss(reduction='mean')
+        self.task_loss = nn.MSELoss(reduction='mean')
 
     def __str__(self):
         """Pretty print model architecture."""
@@ -202,6 +217,7 @@ class Segmenter(BaseModel):
         lambda_weak = self.hparams.get('lambda_weak', 0)
         lambda_strong = self.hparams.get('lambda_strong', 0)
         lambda_pred = self.hparams.get('lambda_pred', 0)
+        lambda_task = self.hparams.get('lambda_task', 0)
 
         # index padding for convolutions
         pad = self.hparams.get('batch_pad', 0)
@@ -227,9 +243,18 @@ class Segmenter(BaseModel):
         else:
             labels_weak = None
 
+        if lambda_task > 0:
+            if pad > 0:
+                tasks = data['tasks'][0][pad:-pad]
+            else:
+                tasks = data['tasks'][0]
+        else:
+            tasks = None
+
         # remove padding from other tensors
         if pad > 0:
             markers = markers_wpad[pad:-pad]
+            # remove padding from model output
             for key, val in outputs_dict.items():
                 outputs_dict[key] = val[pad:-pad] if val is not None else None
         else:
@@ -237,6 +262,7 @@ class Segmenter(BaseModel):
 
         # initialize loss to zero
         loss = 0
+        loss_dict = {}
 
         # ------------------------------------
         # compute loss on weak labels
@@ -254,9 +280,10 @@ class Segmenter(BaseModel):
             # compute fraction correct on weak labels
             outputs_val = outputs_dict['labels'].cpu().detach().numpy()
             fc = accuracy_score(labels_weak.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
-        else:
-            fc = np.nan
-            loss_weak_val = 0
+
+            # log
+            loss_dict['loss_weak'] = loss_weak_val
+            loss_dict['fc'] = fc
 
         # ------------------------------------
         # compute loss on strong labels
@@ -265,8 +292,8 @@ class Segmenter(BaseModel):
             loss_strong = self.class_loss(outputs_dict['labels'], labels_strong)
             loss += lambda_strong * loss_strong
             loss_strong_val = loss_strong.item()
-        else:
-            loss_strong_val = 0
+            # log
+            loss_dict['loss_strong'] = loss_strong_val
 
         # ------------------------------------
         # compute loss on one-step predictions
@@ -275,20 +302,24 @@ class Segmenter(BaseModel):
             loss_pred = self.pred_loss(markers[1:], outputs_dict['prediction'][:-1])
             loss += lambda_pred * loss_pred
             loss_pred_val = loss_pred.item()
-        else:
-            loss_pred_val = 0
+            # log
+            loss_dict['loss_pred'] = loss_pred_val
+
+        # ------------------------------------
+        # compute regression loss on tasks
+        # ------------------------------------
+        if lambda_task > 0:
+            loss_task = self.task_loss(tasks, outputs_dict['task_prediction'])
+            loss += lambda_task * loss_task
+            loss_task_val = loss_task.item()
+            # log
+            loss_dict['loss_task'] = loss_task_val
 
         if accumulate_grad:
             loss.backward()
 
         # collect loss vals
-        loss_dict = {
-            'loss': loss.item(),
-            'loss_weak': loss_weak_val,
-            'loss_strong': loss_strong_val,
-            'loss_pred': loss_pred_val,
-            'fc': fc,
-        }
+        loss_dict['loss'] = loss.item()
 
         return loss_dict
 
