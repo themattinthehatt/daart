@@ -179,7 +179,7 @@ class SingleDataset(data.Dataset):
         id : str
             dataset id
         signals : list of strs
-            e.g. 'markers' | 'labels' | ....
+            e.g. 'markers' | 'labels_strong' | 'tasks' | ....
         transforms : list of transform objects
             each element corresponds to an entry in signals; for multiple transforms, chain
             together using :class:`daart.transforms.Compose` class. See
@@ -288,7 +288,7 @@ class SingleDataset(data.Dataset):
 
         """
 
-        allowed_signals = ['markers', 'labels_strong', 'labels_weak']
+        allowed_signals = ['markers', 'labels_strong', 'labels_weak', 'tasks']
 
         for signal in self.signals:
 
@@ -336,6 +336,21 @@ class SingleDataset(data.Dataset):
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
 
                 # l = dlc[:, 2::3]
+                self.dtypes[signal] = 'float32'
+
+            elif signal == 'tasks':
+
+                file_ext = self.paths[signal].split('.')[-1]
+
+                if file_ext == 'csv':
+
+                    # assume csv with single header row
+                    df = pd.read_csv(self.paths[signal]).drop(['Unnamed: 0'], axis=1)
+                    data_curr = df.values
+
+                else:
+                    raise ValueError('"%s" is an invalid file extension' % file_ext)
+
                 self.dtypes[signal] = 'float32'
 
             elif signal == 'labels_strong':

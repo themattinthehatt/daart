@@ -52,6 +52,10 @@ def run_main(hparams, *args):
 
     for expt_id in hparams['expt_ids']:
 
+        signals_curr = []
+        transforms_curr = []
+        paths_curr = []
+
         # DLC markers or features (i.e. from simba)
         input_type = hparams.get('input_type', 'markers')
         markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.h5')
@@ -61,19 +65,38 @@ def run_main(hparams, *args):
             markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.npy')
         if not os.path.exists(markers_file):
             raise FileNotFoundError('could not find marker file for %s' % expt_id)
-
-        # heuristic labels
-        labels_file = os.path.join(
-            hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
+        signals_curr.append('markers')
+        transforms_curr.append(ZScore())
+        paths_curr.append(markers_file)
 
         # hand labels
-        hand_labels_file = os.path.join(
-            hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
+        if hparams.get('lambda_strong', 0) > 0:
+            hand_labels_file = os.path.join(
+                hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
+            signals_curr.append('labels_strong')
+            transforms_curr.append(None)
+            paths_curr.append(hand_labels_file)
+
+        # heuristic labels
+        if hparams.get('lambda_weak', 0) > 0:
+            heur_labels_file = os.path.join(
+                hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
+            signals_curr.append('labels_weak')
+            transforms_curr.append(None)
+            paths_curr.append(heur_labels_file)
+
+        # tasks
+        if hparams.get('lambda_task', 0) > 0:
+            tasks_labels_file = os.path.join(
+                hparams['data_dir'], 'tasks', expt_id + '.csv')
+            signals_curr.append('tasks')
+            transforms_curr.append(ZScore())
+            paths_curr.append(tasks_labels_file)
 
         # define data generator signals
-        signals.append(['markers', 'labels_weak', 'labels_strong'])
-        transforms.append([ZScore(), None, None])
-        paths.append([markers_file, labels_file, hand_labels_file])
+        signals.append(signals_curr)
+        transforms.append(transforms_curr)
+        paths.append(paths_curr)
 
     # compute padding needed to account for convolutions
     hparams['batch_pad'] = compute_batch_pad(hparams)
@@ -89,13 +112,22 @@ def run_main(hparams, *args):
     # automatically compute input/output sizes from data
     input_size = 0
     for batch in data_gen.datasets[0].data['markers']:
-        print(batch.shape)
         if batch.shape[1] == 0:
             continue
         else:
             input_size = batch.shape[1]
             break
     hparams['input_size'] = input_size
+
+    if hparams.get('lambda_task', 0) > 0:
+        task_size = 0
+        for batch in data_gen.datasets[0].data['tasks']:
+            if batch.shape[1] == 0:
+                continue
+            else:
+                task_size = batch.shape[1]
+                break
+        hparams['task_size'] = task_size
 
     # -------------------------------------
     # build model
