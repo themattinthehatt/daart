@@ -29,7 +29,7 @@ class BaseModel(nn.Module):
         raise NotImplementedError
 
     @staticmethod
-    def _build_linear(self, global_layer_num, name, in_size, out_size):
+    def _build_linear(global_layer_num, name, in_size, out_size):
 
         linear_layer = nn.Sequential()
 
