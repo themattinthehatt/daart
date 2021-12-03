@@ -369,6 +369,7 @@ class SingleDataset(data.Dataset):
                         self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
                         skip_header=1)
                     data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
+
                 self.dtypes[signal] = 'int32'
 
             elif signal == 'labels_weak':

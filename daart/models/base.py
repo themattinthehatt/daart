@@ -7,7 +7,7 @@ import pickle
 from scipy.special import softmax as scipy_softmax
 from scipy.stats import entropy
 import torch
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, r2_score
 from torch import nn, save
 
 # to ignore imports for sphix-autoapidoc
@@ -160,14 +160,21 @@ class Segmenter(BaseModel):
 
         softmax = nn.Softmax(dim=1)
 
-        # initialize container for labels
+        # initialize containers
+
+        # softmax outputs
         labels = [[] for _ in range(data_generator.n_datasets)]
+        # logits
         scores = [[] for _ in range(data_generator.n_datasets)]
+        # latent representation
         embedding = [[] for _ in range(data_generator.n_datasets)]
+        # predictions on regression task
+        task_predictions = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
             labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
             scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
             embedding[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            task_predictions[sess] = [np.array([]) for _ in range(dataset.n_trials)]
 
         # partially fill container (gap trials will be included as nans)
         dtypes = ['train', 'val', 'test']
@@ -177,21 +184,30 @@ class Segmenter(BaseModel):
                 data, sess = data_generator.next_batch(dtype)
                 predictors = data['markers'][0]
                 # targets = data['labels'][0]
+                batch_idx = data['batch_idx'].item()
                 outputs_dict = self.model(predictors)
                 # remove padding if necessary
                 if pad > 0 and remove_pad:
                     for key, val in outputs_dict.items():
                         outputs_dict[key] = val[pad:-pad] if val is not None else None
                 # push through log-softmax, since this is included in the loss and not model
-                labels[sess][data['batch_idx'].item()] = \
+                labels[sess][batch_idx] = \
                     softmax(outputs_dict['labels']).cpu().detach().numpy()
-                embedding[sess][data['batch_idx'].item()] = \
+                embedding[sess][batch_idx] = \
                     outputs_dict['embedding'].cpu().detach().numpy()
                 if return_scores:
-                    scores[sess][data['batch_idx'].item()] = \
+                    scores[sess][batch_idx] = \
+                        outputs_dict['labels'].cpu().detach().numpy()
+                if outputs_dict.get('task_prediction', None) is not None:
+                    task_predictions[sess][batch_idx] = \
                         outputs_dict['labels'].cpu().detach().numpy()
 
-        return {'labels': labels, 'scores': scores, 'embedding': embedding}
+        return {
+            'labels': labels,
+            'scores': scores,
+            'embedding': embedding,
+            'task_predictions': task_predictions
+        }
 
     def loss(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.
@@ -211,7 +227,7 @@ class Segmenter(BaseModel):
         -------
         dict
             - 'loss' (float): total loss (negative log-like under specified noise dist)
-            - 'fc' (float): fraction correct
+            - other loss terms depending on model hyperparameters
 
         """
 
@@ -287,9 +303,10 @@ class Segmenter(BaseModel):
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
             # compute fraction correct on weak labels
-            outputs_val = outputs_dict['labels'].cpu().detach().numpy()
-            fc = accuracy_score(labels_weak.cpu().detach().numpy(), np.argmax(outputs_val, axis=1))
-
+            fc = accuracy_score(
+                labels_weak.cpu().detach().numpy(),
+                np.argmax(outputs_dict['labels'].cpu().detach().numpy(), axis=1)
+            )
             # log
             loss_dict['loss_weak'] = loss_weak_val
             loss_dict['fc'] = fc
@@ -321,8 +338,13 @@ class Segmenter(BaseModel):
             loss_task = self.task_loss(tasks, outputs_dict['task_prediction'])
             loss += lambda_task * loss_task
             loss_task_val = loss_task.item()
+            r2 = r2_score(
+                tasks.cpu().detach().numpy(),
+                outputs_dict['task_prediction'].cpu().detach().numpy()
+            )
             # log
             loss_dict['loss_task'] = loss_task_val
+            loss_dict['task_r2'] = r2
 
         if accumulate_grad:
             loss.backward()
