@@ -35,7 +35,7 @@ MODELS_TO_FIT = [
     {'model_type': 'temporal-mlp', 'sessions': SESSIONS},
     {'model_type': 'lstm', 'sessions': [SESSIONS[0]]},
     {'model_type': 'gru', 'sessions': [SESSIONS[0]]},
-    # # {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
+    # {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
     {'model_type': 'dtcn', 'sessions': [SESSIONS[0]]},
 ]
 
@@ -70,6 +70,13 @@ def make_tmp_data(data_dir):
         if not os.path.exists(file_dir):
             os.makedirs(file_dir)
         make_labels(hand_labels_file, TEMP_DATA['n_time'], TEMP_DATA['n_labels'], nan_frac=0.8)
+
+        # tasks
+        tasks_file = os.path.join(data_dir, 'tasks', session + '.csv')
+        file_dir = os.path.dirname(tasks_file)
+        if not os.path.exists(file_dir):
+            os.makedirs(file_dir)
+        make_tasks(tasks_file, TEMP_DATA['n_time'], TEMP_DATA['n_labels'] + 2)
 
 
 def make_dlc_markers(save_file, n_time, n_markers):
@@ -109,6 +116,13 @@ def make_labels(save_file, n_time, n_labels, nan_frac=0.0):
         df.to_csv(save_file)
     else:
         raise ValueError('invalid file extension "%s"; must use "pkl" or "csv"' % file_ext)
+
+
+def make_tasks(save_file, n_time, n_tasks):
+    data = np.random.randn(n_time, n_tasks)
+    imagenames = np.arange(n_time)
+    df = pd.DataFrame(data, columns=['task_%i' % i for i in range(n_tasks)], index=imagenames)
+    df.to_csv(save_file)
 
 
 def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
