@@ -298,6 +298,7 @@ class DilatedTCN(BaseModel):
         self.classifier = None
         self.classifier_weak = None
         self.predictor = None
+        self.task_predictor = None
         self.build_model()
 
     def __str__(self):
@@ -314,6 +315,10 @@ class DilatedTCN(BaseModel):
             format_str += 'Predictor:\n'
             for i, module in enumerate(self.predictor):
                 format_str += str('    {}: {}\n'.format(i, module))
+        if self.task_predictor is not None:
+            format_str += 'Task Predictor:\n'
+            for i, module in enumerate(self.task_predictor):
+                format_str += str('    {}: {}\n'.format(i, module))
         return format_str
 
     def build_model(self):
@@ -324,11 +329,34 @@ class DilatedTCN(BaseModel):
         # encoder TCN
         global_layer_num = self._build_encoder(global_layer_num=global_layer_num)
 
+        # -------------------------------------------------------------
+        # classifier: single linear layer
+        # -------------------------------------------------------------
         # linear classifier (hand labels)
-        self.classifier = self._build_classifier(global_layer_num=global_layer_num)
+        if self.hparams.get('lambda_strong') > 0:
+            self.classifier = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
 
         # linear classifier (heuristic labels)
-        self.classifier_weak = self._build_classifier(global_layer_num=global_layer_num)
+        if self.hparams.get('lambda_weak') > 0:
+            self.classifier_weak = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
+
+        # update layer info
+        global_layer_num += 1
+
+        # -------------------------------------------------------------
+        # task regression: single linear layer
+        # -------------------------------------------------------------
+        if self.hparams.get('lambda_task') > 0:
+            self.task_predictor = self._build_linear(
+                global_layer_num=global_layer_num, name='regression',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
+
+        # update layer info
+        global_layer_num += 1
 
         # predictor TCN
         if self.hparams.get('lambda_pred', 0) > 0:
@@ -356,20 +384,6 @@ class DilatedTCN(BaseModel):
             global_layer_num += 1
 
         return global_layer_num
-
-    def _build_classifier(self, global_layer_num):
-
-        classifier = nn.Sequential()
-
-        in_size = self.hparams['n_hid_units']
-        out_size = self.hparams['output_size']
-
-        # add layer (cross entropy loss handles activation)
-        layer = nn.Linear(in_features=in_size, out_features=out_size)
-        name = str('dense(classification)_layer_%02i' % global_layer_num)
-        classifier.add_module(name, layer)
-
-        return classifier
 
     def _build_predictor(self, global_layer_num):
 
@@ -440,14 +454,24 @@ class DilatedTCN(BaseModel):
         # x.squeeze() -> x = M x T
         # x.transpose(1, 0) -> x = T x M
         x = self.encoder(x.transpose(1, 0).unsqueeze(0))
+        xt = x.squeeze().transpose(1, 0)
 
         # push embedding through classifiers to get labels
-        xt = x.squeeze().transpose(1, 0)
-        z = self.classifier(xt)
+        if self.hparams.get('lambda_strong', 0) > 0:
+            z = self.classifier(xt)
+        else:
+            z = None
+
         if self.hparams.get('lambda_weak', 0) > 0:
             z_weak = self.classifier_weak(xt)
         else:
             z_weak = None
+
+        # push embedding through linear layer to get task predictions
+        if self.hparams.get('lambda_task', 0) > 0:
+            w = self.task_predictor(xt)
+        else:
+            w = None
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
@@ -455,7 +479,13 @@ class DilatedTCN(BaseModel):
         else:
             y = None
 
-        return {'labels': z, 'labels_weak': z_weak, 'prediction': y, 'embedding': xt}
+        return {
+            'labels': z,
+            'labels_weak': z_weak,
+            'prediction': y,
+            'task_prediction': w,
+            'embedding': xt
+        }
 
 
 class DilationBlock(nn.Module):
