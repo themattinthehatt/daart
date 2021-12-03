@@ -133,14 +133,16 @@ class TemporalMLP(BaseModel):
         # classifier: single linear layer
         # -------------------------------------------------------------
         # linear classifier (hand labels)
-        self.classifier = self._build_linear(
-            global_layer_num=global_layer_num, name='classification',
-            in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
+        if self.hparams.get('lambda_strong') > 0:
+            self.classifier = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
 
         # linear classifier (heuristic labels)
-        self.classifier_weak = self._build_linear(
-            global_layer_num=global_layer_num, name='classification',
-            in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
+        if self.hparams.get('lambda_weak') > 0:
+            self.classifier_weak = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
 
         # update layer info
         global_layer_num += 1
@@ -148,9 +150,10 @@ class TemporalMLP(BaseModel):
         # -------------------------------------------------------------
         # task regression: single linear layer
         # -------------------------------------------------------------
-        self.task_predictor = self._build_linear(
-            global_layer_num=global_layer_num, name='regression',
-            in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
+        if self.hparams.get('lambda_task') > 0:
+            self.task_predictor = self._build_linear(
+                global_layer_num=global_layer_num, name='regression',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
 
         # update layer info
         global_layer_num += 1
@@ -240,7 +243,11 @@ class TemporalMLP(BaseModel):
                 x = layer(x)
 
         # push embedding through classifier to get labels
-        z = self.classifier(x)
+        if self.hparams.get('lambda_strong', 0) > 0:
+            z = self.classifier(x)
+        else:
+            z = None
+
         if self.hparams.get('lambda_weak', 0) > 0:
             z_weak = self.classifier_weak(x)
         else:

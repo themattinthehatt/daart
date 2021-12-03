@@ -23,7 +23,7 @@ lambda_strong: 1
 lambda_pred: 1
 
 # hyperparam on task programming regression loss
-lambda_task: 1
+lambda_task: 0
 
 # name of experiment for test-tube organizing
 tt_experiment_name: test
