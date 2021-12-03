@@ -293,6 +293,7 @@ class Trainer(object):
             early_stop_history: int = 10,
             enable_early_stop: bool = True,
             save_last_model: bool = False,
+            callbacks: list = [],
             **kwargs
     ) -> None:
         """Initialize trainer object with hyperparameters.
@@ -317,6 +318,8 @@ class Trainer(object):
             epochs over which to average early stopping metric
         save_last_model: bool, optional
             True to save out last (as well as best) model
+        callbacks: list, optional
+            list of callback objects
 
         """
 
@@ -329,6 +332,7 @@ class Trainer(object):
         self.early_stop_history = early_stop_history
         self.enable_early_stop = enable_early_stop
         self.save_last_model = save_last_model
+        self.callbacks = callbacks
 
         # account for val check interval > 1; for example, if val_check_interval=5 and
         # early_stop_history=20, then we only need the val loss to increase on 20 / 5 = 4
@@ -505,6 +509,12 @@ class Trainer(object):
                 early_stop.on_val_check(i_epoch, logger.get_loss('val'))
                 if early_stop.should_stop:
                     break
+
+            # ---------------------------------------
+            # run any additional callbacks
+            # ---------------------------------------
+            for callback in self.callbacks:
+                callback.on_epoch_end(curr_batch, i_epoch)
 
         # ---------------------------------------
         # wrap up with final save/eval
