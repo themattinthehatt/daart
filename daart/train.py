@@ -514,7 +514,9 @@ class Trainer(object):
             # run any additional callbacks
             # ---------------------------------------
             for callback in self.callbacks:
-                callback.on_epoch_end(curr_batch, i_epoch)
+                callback.on_epoch_end(
+                    curr_batch=curr_batch, curr_epoch=i_epoch, model=model,
+                    data_generator=data_generator)
 
         # ---------------------------------------
         # wrap up with final save/eval

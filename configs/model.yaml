@@ -13,13 +13,13 @@ n_lags: 4
 # layer nonlinearity
 activation: lrelu
 
-# hyperparam on classifying weak labels
+# hyperparam on classifying heuristic labels OR pseudo labels
 lambda_weak: 1
 
 # hyperparam on classifying strong labels
 lambda_strong: 1
 
-# hyperparam on one-step-ahead prediciton
+# hyperparam on next-step-ahead prediciton
 lambda_pred: 1
 
 # name of experiment for test-tube organizing
@@ -33,3 +33,17 @@ bidirectional: true
 
 # dropout for individual channels of dilated TCN models (soon to be for others)
 dropout: 0.1
+
+# SEMI-SUPERVISION PARAMS
+# -----------------------
+
+# define which semi-supervised algorithm to use
+# null | pseudo_labels
+semi_supervised_algo: null
+
+# fixed probability threshold for pseudo-labels algorithm
+prob_threshold: 0.95
+
+# define epochs where semi-supervised loss weights begin and end linear annealing
+anneal_start: 10
+anneal_end: 20

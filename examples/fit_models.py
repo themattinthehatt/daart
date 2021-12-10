@@ -107,7 +107,14 @@ def run_main(hparams, *args):
     # -------------------------------------
     # train model
     # -------------------------------------
-    trainer = Trainer(**hparams)
+    callbacks = []
+    if hparams['semi_supervised_algo'] == 'pseudo_labels':
+        callbacks.append(AnnealHparam(
+            hparams=model.hparams, key='lambda_weak', epoch_start=hparams['anneal_start'],
+            epoch_end=hparams['anneal_end']))
+        callbacks.append(PseudoLabels(
+            prob_threshold=hparams['prob_threshold'], epoch_start=hparams['anneal_start']))
+    trainer = Trainer(**hparams, callbacks=callbacks)
     trainer.fit(model, data_gen, save_path=model_save_path)
 
     # update hparams upon successful training
