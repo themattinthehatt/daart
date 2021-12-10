@@ -108,7 +108,9 @@ def run_main(hparams, *args):
     # train model
     # -------------------------------------
     callbacks = []
-    if hparams['semi_supervised_algo'] == 'pseudo_labels':
+    if hparams.get('semi_supervised_algo', 'none') == 'pseudo_labels':
+        if model.hparams['lambda_weak'] == 0:
+            raise ValueError('use lambda_weak in model.yaml to weight pseudo label loss')
         callbacks.append(AnnealHparam(
             hparams=model.hparams, key='lambda_weak', epoch_start=hparams['anneal_start'],
             epoch_end=hparams['anneal_end']))
