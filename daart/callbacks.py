@@ -1,5 +1,7 @@
 """Callback classes to control training."""
 
+import numpy as np
+
 
 class BaseCallback(object):
     """Abstract base class for callbacks."""
@@ -64,13 +66,13 @@ class PseudoLabels(BaseCallback):
             return
 
         # push training data through model; collect output probabilities
-        outputs_dict = model.predict_labels(data_gen)
+        outputs_dict = model.predict_labels(data_generator, remove_pad=False)
 
         # outputs_dict['labels']  # list of list of numpy arrays
         # threshold the probabilities to produce pseudo-labels
         pseudo_labels = []
         for dataset in outputs_dict['labels']:
-            # dataset is a list of numpy arrays
+            # `dataset` is a list of numpy arrays
             pseudo_labels_data = []
             for batch in dataset:
                 if batch.shape[0] > 0:
@@ -81,6 +83,8 @@ class PseudoLabels(BaseCallback):
                     batch[batch < 1] = 0
                     # update background class
                     batch[np.sum(batch, axis=1) == 0, 0] = 1
+                    # turn into a one-hot vector
+                    batch = np.argmax(batch, axis=1)
                 pseudo_labels_data.append(batch.astype(np.int))
             pseudo_labels.append(pseudo_labels_data)
 
@@ -89,5 +93,5 @@ class PseudoLabels(BaseCallback):
         # print(total_new_pseudos)
 
         # update the data generator with the new psuedo-labels
-        for dataset, labels in zip(data_gen.datasets, pseudo_labels):
+        for dataset, labels in zip(data_generator.datasets, pseudo_labels):
             dataset.data['labels_weak'] = labels

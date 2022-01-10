@@ -136,8 +136,11 @@ def get_model_params(hparams: dict) -> dict:
         'lambda_weak': hparams['lambda_weak'],
         'lambda_strong': hparams['lambda_strong'],
         'lambda_pred': hparams['lambda_pred'],
+        'input_type': hparams['input_type'],
+        'semi_supervised_algo': hparams.get('semi_supervised_algo', None)
     }
 
+    # get model-specific params
     if model_type == 'temporal-mlp':
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
@@ -170,6 +173,12 @@ def get_model_params(hparams: dict) -> dict:
         hparams_less.pop('lambda_pred')
     else:
         raise NotImplementedError('"%s" is not a valid model type' % model_type)
+
+    # get other params
+    if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
+        hparams_less['prob_threshold'] = hparams['prob_threshold']
+        hparams_less['anneal_start'] = hparams['anneal_start']
+        hparams_less['anneal_end'] = hparams['anneal_end']
 
     return hparams_less
 

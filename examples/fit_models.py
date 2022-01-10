@@ -82,7 +82,8 @@ def run_main(hparams, *args):
     data_gen = DataGenerator(
         hparams['expt_ids'], signals, transforms, paths, device=hparams['device'],
         batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
-        train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'])
+        train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'],
+        input_type=hparams.get('input_type', 'markers'))
     print(data_gen)
 
     # automatically compute input/output sizes from data
@@ -109,13 +110,15 @@ def run_main(hparams, *args):
     # -------------------------------------
     callbacks = []
     if hparams.get('semi_supervised_algo', 'none') == 'pseudo_labels':
+        from daart.callbacks import AnnealHparam, PseudoLabels
         if model.hparams['lambda_weak'] == 0:
-            raise ValueError('use lambda_weak in model.yaml to weight pseudo label loss')
-        callbacks.append(AnnealHparam(
-            hparams=model.hparams, key='lambda_weak', epoch_start=hparams['anneal_start'],
-            epoch_end=hparams['anneal_end']))
-        callbacks.append(PseudoLabels(
-            prob_threshold=hparams['prob_threshold'], epoch_start=hparams['anneal_start']))
+            print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
+        else:
+            callbacks.append(AnnealHparam(
+                hparams=model.hparams, key='lambda_weak', epoch_start=hparams['anneal_start'],
+                epoch_end=hparams['anneal_end']))
+            callbacks.append(PseudoLabels(
+                prob_threshold=hparams['prob_threshold'], epoch_start=hparams['anneal_start']))
     trainer = Trainer(**hparams, callbacks=callbacks)
     trainer.fit(model, data_gen, save_path=model_save_path)
 

@@ -117,7 +117,7 @@ class Segmenter(BaseModel):
         """Process input data."""
         return self.model(x)
 
-    def predict_labels(self, data_generator, return_scores=False):
+    def predict_labels(self, data_generator, return_scores=False, remove_pad=True):
         """
 
         Parameters
@@ -126,6 +126,8 @@ class Segmenter(BaseModel):
             data generator to serve data batches
         return_scores : bool
             return scores before they've been passed through softmax
+        remove_pad : bool
+            remove batch padding from model outputs before returning
 
         Returns
         -------
@@ -162,7 +164,7 @@ class Segmenter(BaseModel):
                 # targets = data['labels'][0]
                 outputs_dict = self.model(predictors)
                 # remove padding if necessary
-                if pad > 0:
+                if pad > 0 and remove_pad:
                     for key, val in outputs_dict.items():
                         outputs_dict[key] = val[pad:-pad] if val is not None else None
                 # push through log-softmax, since this is included in the loss and not model
@@ -244,9 +246,16 @@ class Segmenter(BaseModel):
         if lambda_weak > 0:
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
-                loss_weak = self.class_loss(
-                    outputs_dict['labels_weak'][labels_strong == 0],
-                    labels_weak[labels_strong == 0])
+                try:
+                    loss_weak = self.class_loss(
+                        outputs_dict['labels_weak'][labels_strong == 0],
+                        labels_weak[labels_strong == 0])
+                except:
+                    print("num strong labels: {}".format(torch.sum(labels_strong)))
+                    print("gt: {}".format(torch.sum(outputs_dict['labels_weak'], dim=0)))
+                    print("pred: {}".format(torch.sum(labels_weak, dim=0)))
+                    print(outputs_dict['labels_weak'][labels_strong == 0])
+                    print(labels_weak[labels_strong == 0])
             else:
                 loss_weak = self.class_loss(outputs_dict['labels_weak'], labels_weak)
             loss += lambda_weak * loss_weak
