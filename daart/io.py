@@ -136,6 +136,7 @@ def get_model_params(hparams: dict) -> dict:
         'lambda_weak': hparams['lambda_weak'],
         'lambda_strong': hparams['lambda_strong'],
         'lambda_pred': hparams['lambda_pred'],
+        'lambda_task': hparams.get('lambda_task', 0),
         'input_type': hparams['input_type'],
         'semi_supervised_algo': hparams.get('semi_supervised_algo', None)
     }
@@ -224,8 +225,9 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
     found_match = False
     version = None
     for version in tt_versions:
-        # load hparams
+        # try to load hparams
         try:
+
             try:
                 version_file = os.path.join(tt_expt_dir, version, 'hparams.pkl')
                 with open(version_file, 'rb') as f:
@@ -242,12 +244,17 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
                     break
             else:
                 if verbose:
-                    print('unmatched keys:')
+                    print('unmatched keys, %s:' % version)
                     for key in hparams_less.keys():
                         if hparams_[key] != hparams_less[key]:
-                            print('{} : {}'.format(hparams_[key], hparams_less[key]))
+                            print('{}: {} vs {}'.format(key, hparams_[key], hparams_less[key]))
                     print()
+
         except IOError:
+            # various reasons why this may fail; all mean that this version is not what we seek
+            continue
+        except KeyError:
+            # usually occurs when checking older models against newer models with more hparams
             continue
 
     if found_match:

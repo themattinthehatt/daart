@@ -288,16 +288,9 @@ class Segmenter(BaseModel):
         if lambda_weak > 0:
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
-                try:
-                    loss_weak = self.class_loss(
-                        outputs_dict['labels_weak'][labels_strong == 0],
-                        labels_weak[labels_strong == 0])
-                except:
-                    print("num strong labels: {}".format(torch.sum(labels_strong)))
-                    print("gt: {}".format(torch.sum(outputs_dict['labels_weak'], dim=0)))
-                    print("pred: {}".format(torch.sum(labels_weak, dim=0)))
-                    print(outputs_dict['labels_weak'][labels_strong == 0])
-                    print(labels_weak[labels_strong == 0])
+                loss_weak = self.class_loss(
+                    outputs_dict['labels_weak'][labels_strong == 0],
+                    labels_weak[labels_strong == 0])
             else:
                 loss_weak = self.class_loss(outputs_dict['labels_weak'], labels_weak)
             loss += lambda_weak * loss_weak

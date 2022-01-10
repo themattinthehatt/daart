@@ -175,7 +175,7 @@ def plot_training_curves(
 
     """
 
-    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'fc']
+    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'loss_task', 'fc']
 
     metrics_dfs = [load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids)]
     metrics_df = pd.concat(metrics_dfs, sort=False)
@@ -242,17 +242,27 @@ def load_metrics_csv_as_df(
         if test:
             test_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'test'}
             for metric in metrics_list:
+                name = 'test_%s' % metric
+                if name not in row.keys():
+                    continue
                 metrics_df.append(pd.DataFrame(
-                    {**test_dict, 'loss': metric, 'val': row['test_%s' % metric]}, index=[0]))
+                    {**test_dict, 'loss': metric, 'val': row[name]}, index=[0]))
         else:
             # make dict for val data
             val_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'val'}
             for metric in metrics_list:
+                name = 'val_%s' % metric
+                if name not in row.keys():
+                    continue
                 metrics_df.append(pd.DataFrame(
-                    {**val_dict, 'loss': metric, 'val': row['val_%s' % metric]}, index=[0]))
+                    {**val_dict, 'loss': metric, 'val': row[name]}, index=[0]))
             # make dict for train data
             tr_dict = {'dataset': dataset, 'epoch': row['epoch'], 'dtype': 'train'}
             for metric in metrics_list:
+                name = 'tr_%s' % metric
+                if name not in row.keys():
+                    continue
                 metrics_df.append(pd.DataFrame(
-                    {**tr_dict, 'loss': metric, 'val': row['tr_%s' % metric]}, index=[0]))
+                    {**tr_dict, 'loss': metric, 'val': row[name]}, index=[0]))
+
     return pd.concat(metrics_df, sort=True)
