@@ -6,8 +6,65 @@ import numpy as np
 class BaseCallback(object):
     """Abstract base class for callbacks."""
 
-    def on_epoch_end(self, curr_batch, curr_epoch, model, data_generator, **kwargs):
+    def on_epoch_end(self, data_generator, model, trainer, **kwargs):
         raise NotImplementedError
+
+
+class EarlyStopping(BaseCallback):
+    """Stop training when a monitored quantity has stopped improving.
+
+    Adapted from: https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
+    """
+
+    def __init__(self, patience=10, delta=0.0):
+        """
+
+        Note: It must be noted that the patience parameter counts the number of validation checks
+        with no improvement, and not the number of training epochs. Therefore, with parameters
+        `check_val_interval=10` and `patience=3`, the trainer will perform at least 40 training
+        epochs before being stopped.
+
+        Parameters
+        ----------
+        patience : int, optional
+            number of previous checks to average over when checking for increase in loss
+        delta : float, optional
+            minimum change in monitored quantity to qualify as an improvement
+
+        """
+
+        self.patience = patience
+        self.delta = delta
+
+        self.counter = 0
+        self.best_epoch = 0
+        self.best_loss = np.inf
+
+    def on_epoch_end(self, data_generator, model, trainer, logger=None, **kwargs):
+
+        # skip if this is not a validation epoch
+        if ~np.any(trainer.curr_batch == trainer.val_check_batch):
+            return
+
+        # use overall validation loss for early stopping
+        loss = logger.get_loss('val')
+
+        # update best loss and epoch that it occurred
+        if loss < self.best_loss - self.delta:
+            self.best_loss = loss
+            self.best_epoch = trainer.curr_epoch
+            self.counter = 0
+        else:
+            self.counter += 1
+
+        # check if smoothed loss is starting to increase; exit training if so
+        if (trainer.curr_epoch > trainer.min_epochs) and (self.counter >= self.patience):
+            trainer.should_halt = True
+            print('\n== early stopping criteria met; exiting train loop ==')
+            print('training epochs: %d' % trainer.curr_epoch)
+            print('end cost: %04f' % loss)
+            print('best epoch: %i' % self.best_epoch)
+            print('best cost: %04f\n' % self.best_loss)
 
 
 class AnnealHparam(BaseCallback):
@@ -42,14 +99,14 @@ class AnnealHparam(BaseCallback):
         self.val_start = val_start
         self.val_end = self.hparams[self.key]
 
-    def on_epoch_end(self, curr_batch, curr_epoch, model, data_generator, **kwargs):
+    def on_epoch_end(self, data_generator, model, trainer, **kwargs):
 
-        if curr_epoch < self.epoch_start:
+        if trainer.curr_epoch < self.epoch_start:
             self.hparams[self.key] = self.val_start
-        elif curr_epoch > self.epoch_end:
+        elif trainer.curr_epoch > self.epoch_end:
             self.hparams[self.key] = self.val_end
         else:
-            frac = (curr_epoch - self.epoch_start) / (self.epoch_end - self.epoch_start)
+            frac = (trainer.curr_epoch - self.epoch_start) / (self.epoch_end - self.epoch_start)
             self.hparams[self.key] = self.val_end * frac
 
 
@@ -60,9 +117,9 @@ class PseudoLabels(BaseCallback):
         self.prob_threshold = prob_threshold
         self.epoch_start = epoch_start
 
-    def on_epoch_end(self, curr_batch, curr_epoch, model, data_generator, **kwargs):
+    def on_epoch_end(self, data_generator, model, trainer, **kwargs):
 
-        if curr_epoch < self.epoch_start:
+        if trainer.curr_epoch < self.epoch_start:
             return
 
         # push training data through model; collect output probabilities

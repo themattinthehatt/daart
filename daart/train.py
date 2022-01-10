@@ -14,7 +14,7 @@ from daart.io import export_hparams
 from daart.io import make_dir_if_not_exists
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['Logger', 'EarlyStopping', 'Trainer']
+__all__ = ['Logger', 'Trainer']
 
 
 class Logger(object):
@@ -213,72 +213,6 @@ class Logger(object):
         return self.metrics[dtype]['loss'] / self.metrics[dtype]['batches']
 
 
-class EarlyStopping(object):
-    """Stop training when a monitored quantity has stopped improving.
-
-    Adapted from: https://github.com/Bjarten/early-stopping-pytorch/blob/master/pytorchtools.py
-    """
-
-    @typechecked
-    def __init__(self, patience: int = 10, min_epochs: int = 10, delta: float = 0.) -> None:
-        """
-
-        Parameters
-        ----------
-        patience : int, optional
-            number of previous checks to average over when checking for increase in loss
-        min_epochs : int, optional
-            minimum number of epochs for training
-        delta : float, optional
-            minimum change in monitored quantity to qualify as an improvement
-
-        """
-
-        self.patience = patience
-        self.min_epochs = min_epochs
-        self.delta = delta
-
-        self.counter = 0
-        self.best_epoch = 0
-        self.best_loss = np.inf
-        self.stopped_epoch = 0
-        self.should_stop = False
-
-    @typechecked
-    def on_val_check(self, epoch: Union[int, np.int64], curr_loss: float) -> None:
-        """Check to see if loss has begun to increase on validation data for current epoch.
-
-        Rather than returning the results of the check, this method updates the class attribute
-        :obj:`should_stop`, which is checked externally by the fitting function.
-
-        Parameters
-        ----------
-        epoch : int
-            current epoch
-        curr_loss : float
-            current loss
-
-        """
-
-        # update best loss and epoch that it happened at
-        if curr_loss < self.best_loss - self.delta:
-            self.best_loss = curr_loss
-            self.best_epoch = epoch
-            self.counter = 0
-        else:
-            self.counter += 1
-
-        # check if smoothed loss is starting to increase; exit training if so
-        if epoch > self.min_epochs and self.counter >= self.patience:
-            print('\n== early stopping criteria met; exiting train loop ==')
-            print('training epochs: %d' % epoch)
-            print('end cost: %04f' % curr_loss)
-            print('best epoch: %i' % self.best_epoch)
-            print('best cost: %04f\n' % self.best_loss)
-            self.stopped_epoch = epoch
-            self.should_stop = True
-
-
 class Trainer(object):
 
     @typechecked
@@ -290,8 +224,6 @@ class Trainer(object):
             max_epochs: int = 200,
             val_check_interval: int = 10,
             rng_seed_train: int = 0,
-            early_stop_history: int = 10,
-            enable_early_stop: bool = True,
             save_last_model: bool = False,
             callbacks: list = [],
             **kwargs
@@ -312,10 +244,6 @@ class Trainer(object):
             frequency with which to log performance on val data
         rng_seed_train: int, optional
             control order in which data are served to model
-        early_stop_history: int, optional
-            True to use early stopping; False will train for max_epochs
-        enable_early_stop: bool, optional
-            epochs over which to average early stopping metric
         save_last_model: bool, optional
             True to save out last (as well as best) model
         callbacks: list, optional
@@ -329,24 +257,19 @@ class Trainer(object):
         self.max_epochs = max_epochs
         self.val_check_interval = val_check_interval
         self.rng_seed_train = rng_seed_train
-        self.early_stop_history = early_stop_history
-        self.enable_early_stop = enable_early_stop
         self.save_last_model = save_last_model
         self.callbacks = callbacks
 
-        # account for val check interval > 1; for example, if val_check_interval=5 and
-        # early_stop_history=20, then we only need the val loss to increase on 20 / 5 = 4
-        # successive checks (rather than 20) to terminate training
-        self.patience = self.early_stop_history // self.val_check_interval
+        # monitor training progress
+        self.curr_epoch = 0
+        self.curr_batch = 0
+        self.val_check_batch = None
+        self.should_halt = False
 
     def fit(self, model, data_generator, save_path):
         """Fit pytorch models with stochastic gradient descent and early stopping.
 
-        Training parameters such as min epochs, max epochs, and early stopping hyperparameters are
-        specified in the class constructor.
-
-        For more information on how early stopping is implemented, see the class
-        :class:`EarlyStopping`.
+        Training parameters such as min/max epochs are specified in the class constructor.
 
         Training progess is monitored by calculating the model loss on both training data and
         validation data. The training loss is calculated each epoch, and the validation loss is
@@ -379,7 +302,6 @@ class Trainer(object):
         model.hparams['max_epochs'] = self.max_epochs
         model.hparams['val_check_interval'] = self.val_check_interval
         model.hparams['rng_seed_train'] = self.rng_seed_train
-        model.hparams['early_stop_history'] = self.patience
 
         # -----------------------------------
         # set up training
@@ -391,17 +313,12 @@ class Trainer(object):
         # logging setup
         logger = Logger(n_datasets=data_generator.n_datasets, save_path=save_path)
 
-        # early stopping setup
-        if self.enable_early_stop:
-            early_stop = EarlyStopping(patience=self.patience, min_epochs=self.min_epochs)
-        else:
-            early_stop = None
-
         # enumerate batches on which validation metrics should be recorded
+        best_model_saved = False
         best_val_loss = np.inf
         best_val_epoch = None
         n_train_batches = data_generator.n_tot_batches['train']
-        val_check_batch = np.append(
+        self.val_check_batch = np.append(
             self.val_check_interval * n_train_batches *
             np.arange(1, int((self.max_epochs + 1) / self.val_check_interval)),
             [n_train_batches * self.max_epochs,
@@ -414,11 +331,10 @@ class Trainer(object):
         # -----------------------------------
         # train loop
         # -----------------------------------
-        i_epoch = 0
-        best_model_saved = False
         for i_epoch in tqdm(range(self.max_epochs + 1)):
             # Note: the 0th epoch has no training (randomly initialized model is evaluated) so we
             # cycle through `max_epochs` training epochs
+            self.curr_epoch = i_epoch
 
             # control how data is batched to that models can be restarted from a particular epoch
             torch.manual_seed(self.rng_seed_train + i_epoch)  # order of batches within datasets
@@ -429,6 +345,9 @@ class Trainer(object):
 
             i_batch = 0
             for i_batch in range(data_generator.n_tot_batches['train']):
+
+                if i_epoch > 0:
+                    self.curr_batch += 1
 
                 # -----------------------------------
                 # train step
@@ -454,8 +373,7 @@ class Trainer(object):
                 # --------------------------------------
                 # check validation according to schedule
                 # --------------------------------------
-                curr_batch = (i_batch + 1) + i_epoch * data_generator.n_tot_batches['train']
-                if np.any(curr_batch == val_check_batch):
+                if np.any(self.curr_batch == self.val_check_batch):
 
                     logger.reset_metrics('val')
                     data_generator.reset_iterators('val')
@@ -502,21 +420,15 @@ class Trainer(object):
                         by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
-            # check for early stopping
-            # ---------------------------------------
-            curr_batch = (i_batch + 1) + i_epoch * data_generator.n_tot_batches['train']
-            if early_stop is not None and np.any(curr_batch == val_check_batch):
-                early_stop.on_val_check(i_epoch, logger.get_loss('val'))
-                if early_stop.should_stop:
-                    break
-
-            # ---------------------------------------
-            # run any additional callbacks
+            # run end-of-epoch callbacks
             # ---------------------------------------
             for callback in self.callbacks:
                 callback.on_epoch_end(
-                    curr_batch=curr_batch, curr_epoch=i_epoch, model=model,
-                    data_generator=data_generator)
+                    data_generator=data_generator, model=model, trainer=self, logger=logger)
+
+            if self.should_halt:
+                # break out of training loop; trainer.should_halt is modified by callbacks
+                break
 
         # ---------------------------------------
         # wrap up with final save/eval
@@ -532,9 +444,7 @@ class Trainer(object):
 
         # load weights of best model if not current
         if best_model_saved:
-            model.load_state_dict(torch.load(
-                os.path.join(save_path, 'best_val_model.pt'),
-                map_location=lambda storage, loc: storage))
+            model.load_parameters_from_file(os.path.join(save_path, 'best_val_model.pt'))
 
         # compute test loss
         logger.reset_metrics('test')
@@ -551,8 +461,7 @@ class Trainer(object):
 
             # calculate metrics for each *batch* (rather than whole dataset)
             logger.create_metric_row(
-                'test', i_epoch, i_test, dataset, trial=data['batch_idx'].item(),
-                by_dataset=True)
+                'test', i_epoch, i_test, dataset, trial=data['batch_idx'].item(), by_dataset=True)
 
         # save out hparams
         if save_path is not None:

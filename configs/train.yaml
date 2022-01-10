@@ -23,6 +23,7 @@ val_check_interval: 1
 enable_early_stop: False
 
 # number of epochs over which to average early stopping metric (total loss)
+# early stopping computations also depend on value of val_check_interval
 early_stop_history: 20
 
 # True to save out last (as well as best) model
