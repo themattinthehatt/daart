@@ -466,4 +466,5 @@ class Trainer(object):
         # save out hparams
         if save_path is not None:
             from daart.io import export_hparams
+            model.hparams['best_val_epoch'] = best_val_epoch
             export_hparams(model.hparams, filename=os.path.join(save_path, 'hparams.yaml'))
