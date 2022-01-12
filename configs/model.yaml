@@ -25,6 +25,9 @@ lambda_pred: 1
 # hyperparam on task programming regression loss
 lambda_task: 1
 
+# classifier type: binary | multiclass
+classifier_type: binary
+
 # name of experiment for test-tube organizing
 tt_experiment_name: test
 

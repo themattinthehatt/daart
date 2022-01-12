@@ -44,7 +44,7 @@ class BaseModel(nn.Module):
         """Push data through model."""
         raise NotImplementedError
 
-    def loss(self, *args, **kwargs):
+    def training_step(self, *args, **kwargs):
         """Compute loss."""
         raise NotImplementedError
 
@@ -80,6 +80,8 @@ class Segmenter(BaseModel):
             - n_hid_units (int): hidden units per layer
             - n_lags (int): number of lags in input data to use for temporal convolution
             - activation (str): 'linear' | 'relu' | 'lrelu' | 'sigmoid' | 'tanh'
+            - classifier_type (str): 'multiclass' | 'binary' | 'multibinary'
+            - class_weights (array-like): weights on classes
             - lambda_weak (float): hyperparam on weak label classification
             - lambda_strong (float): hyperparam on srong label classification
             - lambda_pred (float): hyperparam on next step prediction
@@ -92,7 +94,23 @@ class Segmenter(BaseModel):
         self.build_model()
 
         # label loss based on cross entropy; don't compute gradient when target = 0
-        self.class_loss = nn.CrossEntropyLoss(ignore_index=0, reduction='mean')
+        classifier_type = hparams.get('classifier_type', 'multiclass')
+        if classifier_type == 'multiclass':
+            # multiple mutually exclusive classes, 0 is backgroud class
+            ignore_index = 0
+        elif classifier_type == 'binary':
+            # single class
+            ignore_index = -100  # pytorch default
+        elif classmethod == 'multibinary':
+            # multiple non-mutually exclusive classes (each a binary classification)
+            raise NotImplementedError
+        else:
+            raise NotImplementedError("classifier type must be 'multiclass' or 'binary'")
+        weight = hparams.get('class_weights', None)
+        if weight is not None:
+            weight = torch.tensor(weight)
+        self.class_loss = nn.CrossEntropyLoss(
+            weight=weight, ignore_index=ignore_index, reduction='mean')
         self.pred_loss = nn.MSELoss(reduction='mean')
         self.task_loss = nn.MSELoss(reduction='mean')
 
@@ -209,7 +227,7 @@ class Segmenter(BaseModel):
             'task_predictions': task_predictions
         }
 
-    def loss(self, data, accumulate_grad=True, **kwargs):
+    def training_step(self, data, accumulate_grad=True, **kwargs):
         """Calculate negative log-likelihood loss for supervised models.
 
         The batch is split into chunks if larger than a hard-coded `chunk_size` to keep memory
@@ -365,6 +383,10 @@ class Ensembler(object):
         combine_before_softmax : bool, optional
             True to combine logits across models before taking softmax; False to take softmax for
             each model then combine probabilities
+        weights: array-like, str, or NoneType, optional
+            array-like: weight for each model
+            str: 'entropy': weight each model at each time point by inverse entropy of distribution
+            None: uniform weight for each model
 
         Returns
         -------

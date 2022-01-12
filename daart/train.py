@@ -363,7 +363,7 @@ class Trainer(object):
                 data, dataset = data_generator.next_batch('train')
 
                 # call the appropriate loss function
-                loss_dict = model.loss(data, dataset=dataset, accumulate_grad=True)
+                loss_dict = model.training_step(data, dataset=dataset, accumulate_grad=True)
                 logger.update_metrics('train', loss_dict, dataset=dataset)
 
                 # step (evaluate untrained network on epoch 0)
@@ -384,7 +384,8 @@ class Trainer(object):
                         data, dataset = data_generator.next_batch('val')
 
                         # call the appropriate loss function
-                        loss_dict = model.loss(data, dataset=dataset, accumulate_grad=False)
+                        loss_dict = model.training_step(
+                            data, dataset=dataset, accumulate_grad=False)
                         logger.update_metrics('val', loss_dict, dataset=dataset)
 
                     # save best val model
@@ -456,7 +457,7 @@ class Trainer(object):
 
             # call the appropriate loss function
             logger.reset_metrics('test')
-            loss_dict = model.loss(data, dataset=dataset, accumulate_grad=False)
+            loss_dict = model.training_step(data, dataset=dataset, accumulate_grad=False)
             logger.update_metrics('test', loss_dict, dataset=dataset)
 
             # calculate metrics for each *batch* (rather than whole dataset)
