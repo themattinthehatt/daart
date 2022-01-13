@@ -543,6 +543,8 @@ class DilationBlock(nn.Module):
         else:
             raise ValueError('"%s" is an invalid activation function' % final_activation)
 
+        # no Dropout1D in pytorch API, but Dropout2D does what what we want:
+        # takes an input of shape (N, C, L) and drops out entire features in the `C` dimension
         self.dropout = nn.Dropout2d(dropout)
 
         # build net
