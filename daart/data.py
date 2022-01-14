@@ -308,7 +308,6 @@ class SingleDataset(data.Dataset):
                         x = markers[:, 0::3]
                         y = markers[:, 1::3]
                         data_curr = np.hstack([x, y])
-                        print(df)
 
                     else:
                         # assume csv with single header row
@@ -356,13 +355,13 @@ class SingleDataset(data.Dataset):
             elif signal == 'labels_strong':
 
                 if (self.paths[signal] is None) or not os.path.exists(self.paths[signal]):
-                    # if no path given, assume same size as weak labels and set all to background
-                    if 'labels_weak' in self.data.keys():
+                    # if no path given, assume same size as markers and set all to background
+                    if 'markers' in self.data.keys():
                         data_curr = np.zeros(
-                            (len(self.data['labels_weak']) * batch_size,), dtype=np.int)
+                            (len(self.data['markers']) * batch_size,), dtype=np.int)
                     else:
                         raise FileNotFoundError(
-                            'Could not load "labels_strong" from None file without weak labels')
+                            'Could not load "labels_strong" from None file without markers')
                 else:
                     # assume csv output from deepethogram labeler
                     labels = np.genfromtxt(

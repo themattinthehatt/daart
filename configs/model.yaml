@@ -48,8 +48,8 @@ dropout: 0.1
 semi_supervised_algo: null
 
 # fixed probability threshold for pseudo-labels algorithm
-prob_threshold: 0.95
+prob_threshold: 0.9
 
 # define epochs where semi-supervised loss weights begin and end linear annealing
-anneal_start: 10
-anneal_end: 20
+anneal_start: 25
+anneal_end: 50
