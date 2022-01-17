@@ -69,15 +69,15 @@ def get_precision_recall(
         labels=labels, average=None, zero_division=0)
 
     # replace 0s with NaNs for classes with no ground truth
-    for n in range(precision.shape[0]):
-        if precision[n] == 0 and recall[n] == 0:
-            precision[n] = np.nan
-            recall[n] = np.nan
+    # for n in range(precision.shape[0]):
+    #     if precision[n] == 0 and recall[n] == 0:
+    #         precision[n] = np.nan
+    #         recall[n] = np.nan
 
     # compute f1
     p = precision
     r = recall
-    f1 = 2 * p * r / (p + r)
+    f1 = 2 * p * r / (p + r + 1e-10)
     return {'precision': p, 'recall': r, 'f1': f1}
 
 
