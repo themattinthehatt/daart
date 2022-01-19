@@ -20,11 +20,11 @@ max_epochs: 500
 val_check_interval: 1
 
 # True to use early stopping; False will train until max_epochs are reached
-enable_early_stop: False
+enable_early_stop: True
 
 # number of epochs over which to average early stopping metric (total loss)
 # early stopping computations also depend on value of val_check_interval
-early_stop_history: 20
+early_stop_history: 5
 
 # True to save out last (as well as best) model
 save_last_model: False

@@ -14,6 +14,7 @@ of trials, which are split into training, validation, and testing trials using t
 
 from collections import OrderedDict
 import h5py
+import logging
 import numpy as np
 import os
 import pandas as pd
@@ -509,9 +510,11 @@ class DataGenerator(object):
                             # subsample as fraction of total batches
                             n_idxs = int(np.floor(train_frac * n_batches))
                             if n_idxs <= 0:
-                                print(
-                                    'warning: attempting to use invalid number of training ' +
-                                    'batches; defaulting to all training batches')
+                                print_str = (
+                                    f'warning: attempting to use invalid number of training '
+                                    f'batches; defaulting to all training batches'
+                                )
+                                logging.info(print_str)
                                 n_idxs = n_batches
                         else:
                             # subsample fixed number of batches

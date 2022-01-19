@@ -1,5 +1,6 @@
 """Callback classes to control training."""
 
+import logging
 import numpy as np
 
 
@@ -60,11 +61,12 @@ class EarlyStopping(BaseCallback):
         # check if smoothed loss is starting to increase; exit training if so
         if (trainer.curr_epoch > trainer.min_epochs) and (self.counter >= self.patience):
             trainer.should_halt = True
-            print('\n== early stopping criteria met; exiting train loop ==')
-            print('training epochs: %d' % trainer.curr_epoch)
-            print('end cost: %04f' % loss)
-            print('best epoch: %i' % self.best_epoch)
-            print('best cost: %04f\n' % self.best_loss)
+            print_str = '\n== early stopping criteria met; exiting train loop ==\n'
+            print_str += 'training epochs: %d\n' % trainer.curr_epoch
+            print_str += 'end cost: %04f\n' % loss
+            print_str += 'best epoch: %i\n' % self.best_epoch
+            print_str += 'best cost: %04f\n' % self.best_loss
+            logging.info(print_str)
 
 
 class AnnealHparam(BaseCallback):

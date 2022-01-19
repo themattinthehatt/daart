@@ -1,6 +1,7 @@
 """Example script for fitting daart models from the command line with test-tube package."""
 
 import copy
+import logging
 import numpy as np
 import os
 import sys
@@ -25,9 +26,6 @@ def run_main(hparams, *args):
     if not isinstance(hparams, dict):
         hparams = vars(hparams)
 
-    # print hparams to console
-    print_hparams(hparams)
-
     # start at random times (so test tube creates separate folders)
     t = time.time()
     np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
@@ -40,8 +38,26 @@ def run_main(hparams, *args):
         print('Experiment exists! Aborting fit')
         return
 
-    # where model results will be saved
-    model_save_path = hparams['tt_version_dir']
+    # set up error logging (different from train logging)
+    logging.basicConfig(
+        filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
+        filemode='w', level=logging.DEBUG,
+        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
+    )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
+
+    # run train model script
+    try:
+        train_model(hparams)
+    except:
+        logging.exception('error traceback')
+
+
+def train_model(hparams):
+
+    # print hparams to console
+    print_str = print_hparams(hparams)
+    logging.info(print_str)
 
     # -------------------------------------
     # build data generator
@@ -107,7 +123,7 @@ def run_main(hparams, *args):
         batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
         train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'],
         input_type=hparams.get('input_type', 'markers'))
-    print(data_gen)
+    logging.info(data_gen)
 
     # automatically compute input/output sizes from data
     input_size = 0
@@ -135,7 +151,7 @@ def run_main(hparams, *args):
     torch.manual_seed(hparams.get('rng_seed_model', 0))
     model = Segmenter(hparams)
     model.to(hparams['device'])
-    print(model)
+    logging.info(model)
 
     # -------------------------------------
     # set up training callbacks
@@ -162,7 +178,7 @@ def run_main(hparams, *args):
     # train model + cleanup
     # -------------------------------------
     trainer = Trainer(**hparams, callbacks=callbacks)
-    trainer.fit(model, data_gen, save_path=model_save_path)
+    trainer.fit(model, data_gen, save_path=hparams['tt_version_dir'])
 
     # update hparams upon successful training
     hparams['training_completed'] = True
@@ -172,11 +188,13 @@ def run_main(hparams, *args):
     if hparams.get('plot_train_curves', False):
         plot_training_curves(
             os.path.join(model_save_path, 'metrics.csv'), dtype='train',
-            expt_ids=hparams['expt_ids'], save_file=os.path.join(model_save_path, 'train_curves'),
+            expt_ids=hparams['expt_ids'],
+            save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
             format='png')
         plot_training_curves(
             os.path.join(model_save_path, 'metrics.csv'), dtype='val',
-            expt_ids=hparams['expt_ids'], save_file=os.path.join(model_save_path, 'val_curves'),
+            expt_ids=hparams['expt_ids'],
+            save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
             format='png')
 
     # get rid of unneeded logging info
@@ -220,12 +238,14 @@ def get_all_params():
 def print_hparams(hparams):
     """Pretty print hparams to console."""
     config_files = ['data', 'model', 'train']
+    print_str = ''
     for config_file in config_files:
-        print('\n%s CONFIG:' % config_file.upper())
+        print_str += '\n%s CONFIG:\n' % config_file.upper()
         config_dict = yaml.safe_load(open(hparams['%s_config' % config_file]))
         for key in config_dict.keys():
-            print('    {}: {}'.format(key, hparams[key]))
-    print('')
+            print_str += '    {}: {}\n'.format(key, hparams[key])
+    print_str += '\n'
+    return print_str
 
 
 def create_tt_experiment(hparams):
