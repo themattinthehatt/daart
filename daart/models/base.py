@@ -97,7 +97,7 @@ class Segmenter(BaseModel):
         classifier_type = hparams.get('classifier_type', 'multiclass')
         if classifier_type == 'multiclass':
             # multiple mutually exclusive classes, 0 is backgroud class
-            ignore_index = 0
+            ignore_index = hparams.get('ignore_class', 0)
         elif classifier_type == 'binary':
             # single class
             ignore_index = -100  # pytorch default
