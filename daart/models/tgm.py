@@ -15,10 +15,6 @@ class TGM(BaseModel):
     def __init__(self, hparams):
         pass
 
-    def __str__(self):
-        """Pretty print the model architecture."""
-        pass
-
     def build_model(self):
         """Construct the model using hparams."""
         pass

@@ -21,22 +21,6 @@ class TCN(BaseModel):
         self.predictor = None
         self.build_model()
 
-    def __str__(self):
-        """Pretty print model architecture."""
-        format_str = '\nTCN architecture\n'
-        format_str += '------------------------\n'
-        format_str += 'Encoder:\n'
-        for i, module in enumerate(self.encoder):
-            format_str += str('    {}: {}\n'.format(i, module))
-        format_str += 'Classifier:\n'
-        for i, module in enumerate(self.classifier):
-            format_str += str('    {}: {}\n'.format(i, module))
-        if self.predictor is not None:
-            format_str += 'Predictor:\n'
-            for i, module in enumerate(self.predictor):
-                format_str += str('    {}: {}\n'.format(i, module))
-        return format_str
-
     def build_model(self):
         """Construct the model using hparams."""
 
@@ -300,26 +284,6 @@ class DilatedTCN(BaseModel):
         self.predictor = None
         self.task_predictor = None
         self.build_model()
-
-    def __str__(self):
-        format_str = '\nTCN architecture\n'
-        format_str += '------------------------\n'
-        format_str += 'Encoder:\n'
-        for i, module in enumerate(self.encoder):
-            format_str += str('    {}: {}\n'.format(i, module))
-        format_str += 'Classifier:\n'
-        for i, module in enumerate(self.classifier):
-            format_str += str('    {}: {}\n'.format(i, module))
-        format_str += '\n'
-        if self.predictor is not None:
-            format_str += 'Predictor:\n'
-            for i, module in enumerate(self.predictor):
-                format_str += str('    {}: {}\n'.format(i, module))
-        if self.task_predictor is not None:
-            format_str += 'Task Predictor:\n'
-            for i, module in enumerate(self.task_predictor):
-                format_str += str('    {}: {}\n'.format(i, module))
-        return format_str
 
     def build_model(self):
         """Construct the model using hparams."""
