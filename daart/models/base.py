@@ -121,24 +121,24 @@ class Segmenter(BaseModel):
         format_str += '------------------------\n'
 
         format_str += 'Encoder:\n'
-        for i, module in enumerate(self.encoder):
+        for i, module in enumerate(self.model.encoder):
             format_str += str('    {}: {}\n'.format(i, module))
 
-        if self.predictor is not None:
+        if self.model.predictor is not None:
             format_str += 'Classifier:\n'
-            for i, module in enumerate(self.classifier):
+            for i, module in enumerate(self.model.classifier):
                 format_str += str('    {}: {}\n'.format(i, module))
         format_str += '\n'
 
-        if self.predictor is not None:
+        if self.model.predictor is not None:
             format_str += 'Predictor:\n'
-            for i, module in enumerate(self.predictor):
+            for i, module in enumerate(self.model.predictor):
                 format_str += str('    {}: {}\n'.format(i, module))
         format_str += '\n'
 
-        if self.task_predictor is not None:
+        if self.model.task_predictor is not None:
             format_str += 'Task Predictor:\n'
-            for i, module in enumerate(self.task_predictor):
+            for i, module in enumerate(self.model.task_predictor):
                 format_str += str('    {}: {}\n'.format(i, module))
 
         return format_str
