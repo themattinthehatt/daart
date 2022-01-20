@@ -90,6 +90,7 @@ class Segmenter(BaseModel):
         """
         super().__init__()
         self.hparams = hparams
+        self.model_type = hparams['model_type']
         self.model = None
         self.build_model()
 
