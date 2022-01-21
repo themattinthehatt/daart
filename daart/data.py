@@ -26,7 +26,9 @@ from typing import List, Optional, Union
 from typeguard import typechecked
 
 
-__all__ = ['split_trials', 'compute_batches', 'SingleDataset', 'DataGenerator']
+__all__ = [
+    'split_trials', 'compute_batches', 'compute_batch_pad', 'SingleDataset', 'DataGenerator',
+]
 
 
 @typechecked
@@ -155,6 +157,41 @@ def compute_batches(
             batched_data[b] = data[idx_beg:idx_end]
 
     return batched_data
+
+
+@typechecked
+def compute_batch_pad(hparams: dict) -> int:
+    """Compute padding needed to account for convolutions.
+
+    Parameters
+    ----------
+    hparams : dict
+        contains model architecture type and hyperparameter info (lags, n_hidden_layers, etc)
+
+    Returns
+    -------
+    int
+        amount of padding that needs to be added to beginning/end of each batch
+
+    """
+
+    if hparams['model_type'].lower() == 'temporal-mlp':
+        pad = hparams['n_lags']
+    elif hparams['model_type'].lower() == 'tcn':
+        pad = (2 ** hparams['n_hid_layers']) * hparams['n_lags']
+    elif hparams['model_type'].lower() == 'dtcn':
+        # dilattion of each dilation block is 2 ** layer_num
+        # 2 conv layers per dilation block
+        pad = sum([2 * (2 ** n) * hparams['n_lags'] for n in range(hparams['n_hid_layers'])])
+    elif hparams['model_type'].lower() in ['lstm', 'gru']:
+        # give some warmup timesteps
+        pad = 4
+    elif hparams['model_type'].lower() == 'tgm':
+        raise NotImplementedError
+    else:
+        raise ValueError('"%s" is not a valid model type' % hparams['model_type'])
+
+    return pad
 
 
 class SingleDataset(data.Dataset):

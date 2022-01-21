@@ -17,8 +17,7 @@ from daart.io import find_experiment
 from daart.io import get_expt_dir, get_model_dir, get_subdirs
 from daart.models import Segmenter
 from daart.train import Trainer
-from daart.transforms import ZScore
-from daart.utils import compute_batch_pad
+from daart.utils import build_data_generator
 
 
 def run_main(hparams, *args):
@@ -62,88 +61,8 @@ def train_model(hparams):
     # -------------------------------------
     # build data generator
     # -------------------------------------
-    signals = []
-    transforms = []
-    paths = []
-
-    for expt_id in hparams['expt_ids']:
-
-        signals_curr = []
-        transforms_curr = []
-        paths_curr = []
-
-        # DLC markers or features (i.e. from simba)
-        input_type = hparams.get('input_type', 'markers')
-        markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.h5')
-        if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.csv')
-        if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.npy')
-        if not os.path.exists(markers_file):
-            raise FileNotFoundError('could not find marker file for %s' % expt_id)
-        signals_curr.append('markers')
-        transforms_curr.append(ZScore())
-        paths_curr.append(markers_file)
-
-        # hand labels
-        if hparams.get('lambda_strong', 0) > 0:
-            hand_labels_file = os.path.join(
-                hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
-            signals_curr.append('labels_strong')
-            transforms_curr.append(None)
-            paths_curr.append(hand_labels_file)
-
-        # heuristic labels
-        if hparams.get('lambda_weak', 0) > 0:
-            heur_labels_file = os.path.join(
-                hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
-            signals_curr.append('labels_weak')
-            transforms_curr.append(None)
-            paths_curr.append(heur_labels_file)
-
-        # tasks
-        if hparams.get('lambda_task', 0) > 0:
-            tasks_labels_file = os.path.join(
-                hparams['data_dir'], 'tasks', expt_id + '.csv')
-            signals_curr.append('tasks')
-            transforms_curr.append(ZScore())
-            paths_curr.append(tasks_labels_file)
-
-        # define data generator signals
-        signals.append(signals_curr)
-        transforms.append(transforms_curr)
-        paths.append(paths_curr)
-
-    # compute padding needed to account for convolutions
-    hparams['batch_pad'] = compute_batch_pad(hparams)
-
-    # build data generator
-    data_gen = DataGenerator(
-        hparams['expt_ids'], signals, transforms, paths, device=hparams['device'],
-        batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
-        train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'],
-        input_type=hparams.get('input_type', 'markers'))
+    data_gen = build_data_generator(hparams)
     logging.info(data_gen)
-
-    # automatically compute input/output sizes from data
-    input_size = 0
-    for batch in data_gen.datasets[0].data['markers']:
-        if batch.shape[1] == 0:
-            continue
-        else:
-            input_size = batch.shape[1]
-            break
-    hparams['input_size'] = input_size
-
-    if hparams.get('lambda_task', 0) > 0:
-        task_size = 0
-        for batch in data_gen.datasets[0].data['tasks']:
-            if batch.shape[1] == 0:
-                continue
-            else:
-                task_size = batch.shape[1]
-                break
-        hparams['task_size'] = task_size
 
     # -------------------------------------
     # build model
@@ -236,7 +155,7 @@ def get_all_params():
 
 
 def print_hparams(hparams):
-    """Pretty print hparams to console."""
+    """Nicely formatted hparams string."""
     config_files = ['data', 'model', 'train']
     print_str = ''
     for config_file in config_files:

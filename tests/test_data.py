@@ -1,6 +1,10 @@
-import pytest
+import copy
 import numpy as np
+import pytest
+import torch
+
 from daart.data import split_trials, compute_batches
+from daart.utils import build_data_generator
 
 
 def test_split_trials():
@@ -61,3 +65,99 @@ def test_compute_batches():
     assert len(batch_data) == T // B
     assert batch_data[0].shape == (B, N)
     assert np.all(batch_data[0] == data[:B, :])
+
+
+def test_single_dataset(hparams, data_generator):
+
+    dataset = data_generator.datasets[0]
+
+    # make sure we accurately record number of batches
+    assert 'markers' in dataset.data
+    n_trials = len(dataset.data['markers'])
+    assert len(dataset) == n_trials
+
+    # make sure batch sizes are good: access batch 0 from dataset 0
+    batch = dataset[0]
+    assert isinstance(batch, dict)
+    assert 'markers' in batch.keys()
+    assert 'batch_idx' in batch.keys()
+    for key, val in batch.items():
+        if key != 'batch_idx':
+            # make sure all data tensors have the same batch dimension
+            assert val.shape[0] == batch['markers'].shape[0]
+
+    # make sure batches are torch tensors
+    assert isinstance(batch['markers'], torch.Tensor)
+
+    # make sure batches are on the right device
+    assert batch['markers'].device == torch.device('cpu')
+
+
+def test_data_generator(hparams, data_generator):
+
+    # make sure we accurately record number of datasets
+    n_datasets = len(hparams['expt_ids'])
+    assert len(data_generator) == n_datasets
+
+    # make sure batch sizes are good
+    batch, dataset = data_generator.next_batch('train')
+
+    assert dataset < n_datasets
+
+    assert isinstance(batch, dict)
+    assert 'markers' in batch.keys()
+    assert 'batch_idx' in batch.keys()
+    for key, val in batch.items():
+        if key != 'batch_idx':
+            # make sure all data tensors have the same batch dimension
+            assert val.shape[0] == batch['markers'].shape[0]
+
+    # make sure batches are torch tensors
+    assert isinstance(batch['markers'], torch.Tensor)
+
+    # make sure batches are on the right device
+    assert batch['markers'].device == torch.device('cpu')
+
+
+def test_data_generator_loading(hparams):
+
+    hp = copy.deepcopy(hparams)
+    hp['expt_ids'] = hparams['expt_ids'][:1]  # only load one dataset for efficiency
+
+    # load markers only
+    hp['lambda_strong'] = 0
+    hp['lambda_weak'] = 0
+    hp['lambda_pred'] = 1
+    hp['lambda_task'] = 0
+    data_gen = build_data_generator(hp)
+    dtypes = data_gen.datasets[0].data.keys()
+    assert 'markers' in dtypes
+    assert 'labels_strong' not in dtypes
+    assert 'labels_weak' not in dtypes
+    assert 'tasks' not in dtypes
+
+    # load markers + strong labels
+    hp['lambda_strong'] = 1
+    hp['lambda_weak'] = 0
+    hp['lambda_pred'] = 0
+    hp['lambda_task'] = 0
+    data_gen = build_data_generator(hp)
+    dtypes = data_gen.datasets[0].data.keys()
+    assert 'markers' in dtypes
+    assert 'labels_strong' in dtypes
+    assert 'labels_weak' not in dtypes
+    assert 'tasks' not in dtypes
+
+    # load markers + weak labels
+    hp['lambda_strong'] = 0
+    hp['lambda_weak'] = 1
+    hp['lambda_pred'] = 0
+    hp['lambda_task'] = 0
+    data_gen = build_data_generator(hp)
+    dtypes = data_gen.datasets[0].data.keys()
+    assert 'markers' in dtypes
+    assert 'labels_strong' not in dtypes
+    assert 'labels_weak' in dtypes
+    assert 'tasks' not in dtypes
+
+    # TODO: tasks; need to upload task data to repo
