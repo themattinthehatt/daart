@@ -135,37 +135,38 @@ class RNN(BaseModel):
         Parameters
         ----------
         x : torch.Tensor object
-            input data
+            input data of shape (n_sequences, sequence_length, n_markers)
 
         Returns
         -------
-        torch.Tensor
-            mean prediction of model
+        dict
+            - 'labels' (torch.Tensor): model classification
+            - 'labels' (torch.Tensor): model classification of weak/pseudo labels
+            - 'prediction' (torch.Tensor): one-step-ahead prediction
+            - 'task_prediction' (torch.Tensor): prediction of regression tasks
+            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
 
         """
 
         # push data through encoder to get latent embedding
-        # x is of shape (T, input_size)
-        # unsqueeze adds new dim in front; now shape (1, T, input_size)
-        x = x.unsqueeze(0)
+        # x = B x T x N (e.g. B = 2, T = 500, N = 16)
         for name, layer in self.encoder.named_children():
             x, _ = layer(x)
 
-        xt = x.squeeze()
         # push embedding through classifier to get labels
         if self.hparams.get('lambda_strong', 0) > 0:
-            z = self.classifier(xt)
+            z = self.classifier(x)
         else:
             z = None
 
         if self.hparams.get('lambda_weak', 0) > 0:
-            z_weak = self.classifier_weak(xt)
+            z_weak = self.classifier_weak(x)
         else:
             z_weak = None
 
         # push embedding through linear layer to get task predictions
         if self.hparams.get('lambda_task', 0) > 0:
-            w = self.task_predictor(xt)
+            w = self.task_predictor(x)
         else:
             w = None
 
@@ -176,14 +177,14 @@ class RNN(BaseModel):
                 if name[:4] == 'LSTM' or name[:3] == 'GRU':
                     y, _ = layer(y)
                 else:
-                    y = layer(y.squeeze())
+                    y = layer(y)
         else:
             y = None
 
         return {
-            'labels': z,
-            'labels_weak': z_weak,
-            'prediction': y,
-            'task_prediction': w,
-            'embedding': xt
+            'labels': z,  # (n_sequences, sequence_length, n_classes)
+            'labels_weak': z_weak,  # (n_sequences, sequence_length, n_classes)
+            'prediction': y,  # (n_sequences, sequence_length, n_markers)
+            'task_prediction': w,  # (n_sequences, sequence_length, n_tasks)
+            'embedding': x  # (n_sequences, sequence_length, embedding_dim)
         }

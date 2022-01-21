@@ -22,7 +22,7 @@ def test_tcn(hparams, data_generator):
 
     # process a batch of data
     batch = data_generator.datasets[0][0]
-    output_dict = model(batch['markers'].unsqueeze(0))
+    output_dict = model(batch['markers'].unsqueeze(0))  # add batch dim
     dtypes = output_dict.keys()
     assert 'labels' in dtypes
     assert 'labels_weak' in dtypes

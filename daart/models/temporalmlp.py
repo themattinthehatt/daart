@@ -192,15 +192,16 @@ class TemporalMLP(BaseModel):
         Parameters
         ----------
         x : torch.Tensor object
-            input data
+            input data of shape (n_sequences, sequence_length, n_markers)
 
         Returns
         -------
         dict
             - 'labels' (torch.Tensor): model classification
+            - 'labels' (torch.Tensor): model classification of weak/pseudo labels
             - 'prediction' (torch.Tensor): one-step-ahead prediction
-            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
             - 'task_prediction' (torch.Tensor): prediction of regression tasks
+            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
 
         """
 
@@ -211,14 +212,12 @@ class TemporalMLP(BaseModel):
                 # input is batch x in_channels x time
                 # output is batch x out_channels x time
 
-                # x = T x N (T = 500, N = 16)
-                # x.transpose(1, 0) -> x = N x T
-                # x.unsqueeze(0) -> x = 1 x N x T
-                # x = layer(x) -> x = 1 x M x T
-                # x.squeeze() -> x = M x T
-                # x.transpose(1, 0) -> x = T x M
+                # x = B x T x N (e.g. B = 2, T = 500, N = 16)
+                # x.transpose(1, 2) -> x = B x N x T
+                # x = layer(x) -> x = B x M x T
+                # x.transpose(1, 2) -> x = B x T x M
 
-                x = layer(x.transpose(1, 0).unsqueeze(0)).squeeze().transpose(1, 0)
+                x = layer(x.transpose(1, 2)).transpose(1, 2)
             else:
                 x = layer(x)
 
@@ -248,9 +247,9 @@ class TemporalMLP(BaseModel):
             y = None
 
         return {
-            'labels': z,
-            'labels_weak': z_weak,
-            'prediction': y,
-            'task_prediction': w,
-            'embedding': x
+            'labels': z,  # (n_sequences, sequence_length, n_classes)
+            'labels_weak': z_weak,  # (n_sequences, sequence_length, n_classes)
+            'prediction': y,  # (n_sequences, sequence_length, n_markers)
+            'task_prediction': w,  # (n_sequences, sequence_length, n_tasks)
+            'embedding': x  # (n_sequences, sequence_length, embedding_dim)
         }
