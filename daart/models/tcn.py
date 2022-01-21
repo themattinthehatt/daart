@@ -399,7 +399,7 @@ class DilatedTCN(BaseModel):
         Parameters
         ----------
         x : torch.Tensor object
-            input data
+            input data of shape (n_sequences, sequence_length, n_markers)
 
         Returns
         -------
@@ -411,14 +411,12 @@ class DilatedTCN(BaseModel):
         """
 
         # push data through encoder to get latent embedding
-        # x = T x N (T = 500, N = 16)
-        # x.transpose(1, 0) -> x = N x T
-        # x.unsqueeze(0) -> x = 1 x N x T
-        # x = layer(x) -> x = 1 x M x T
-        # x.squeeze() -> x = M x T
-        # x.transpose(1, 0) -> x = T x M
-        x = self.encoder(x.transpose(1, 0).unsqueeze(0))
-        xt = x.squeeze().transpose(1, 0)
+        # x = B x T x N (e.g. B = 2, T = 500, N = 16)
+        # x.transpose(1, 2) -> x = B x N x T
+        # x = layer(x) -> x = B x M x T
+        # x.transpose(1, 2) -> x = B x T x M
+        x = self.encoder(x.transpose(1, 2))
+        xt = x.transpose(1, 2)
 
         # push embedding through classifiers to get labels
         if self.hparams.get('lambda_strong', 0) > 0:
@@ -439,16 +437,16 @@ class DilatedTCN(BaseModel):
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
-            y = self.predictor(x).squeeze().transpose(1, 0)
+            y = self.predictor(x).transpose(1, 2)
         else:
             y = None
 
         return {
-            'labels': z,
-            'labels_weak': z_weak,
-            'prediction': y,
-            'task_prediction': w,
-            'embedding': xt
+            'labels': z,  # (n_sequences, sequence_length, n_classes)
+            'labels_weak': z_weak,  # (n_sequences, sequence_length, n_classes)
+            'prediction': y,  # (n_sequences, sequence_length, n_markers)
+            'task_prediction': w,  # (n_sequences, sequence_length, n_tasks)
+            'embedding': xt  # (n_sequences, sequence_length, embedding_dim)
         }
 
 

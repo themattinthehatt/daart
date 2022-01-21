@@ -4,8 +4,11 @@
 # adam learning rate
 learning_rate: 0.0001
 
-# batch size
-batch_size: 500
+# length of temporally contiguous sequences
+sequence_length: 500
+
+# number of sequences per batch
+batch_size: 2
 
 # general l2 reg on parameters
 l2_reg: 0
@@ -39,7 +42,7 @@ trial_splits: 9;1;0;0
 rng_seed_train: 0
 
 # plot final training curves
-plot_train_curves: False
+plot_train_curves: True
 
 
 # COMPUTE RESOURCES PARAMTERS

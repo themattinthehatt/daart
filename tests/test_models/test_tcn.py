@@ -1,5 +1,6 @@
 import copy
 import pytest
+import torch
 
 from daart.models import Segmenter
 from daart.models.tcn import DilatedTCN
@@ -21,7 +22,7 @@ def test_tcn(hparams, data_generator):
 
     # process a batch of data
     batch = data_generator.datasets[0][0]
-    output_dict = model(batch['markers'])
+    output_dict = model(batch['markers'].unsqueeze(0))
     dtypes = output_dict.keys()
     assert 'labels' in dtypes
     assert 'labels_weak' in dtypes
@@ -30,11 +31,27 @@ def test_tcn(hparams, data_generator):
     assert 'embedding' in dtypes
 
     batch_size = output_dict['embedding'].shape[0]
+    assert len(output_dict['embedding'].shape) == 3  # (n_seqs, seq_len, embedding_dim)
     if output_dict['labels'] is not None:
         assert output_dict['labels'].shape[0] == batch_size
+        assert len(output_dict['labels'].shape) == 3  # (n_seqs, seq_len, n_classes)
     if output_dict['labels_weak'] is not None:
         assert output_dict['labels_weak'].shape[0] == batch_size
+        assert len(output_dict['labels_weak'].shape) == 3  # (n_seqs, seq_len, n_classes)
     if output_dict['prediction'] is not None:
         assert output_dict['prediction'].shape[0] == batch_size
+        assert len(output_dict['prediction'].shape) == 3  # (n_seqs, seq_len, n_markers)
     if output_dict['task_prediction'] is not None:
-        assert output_dict['task_prediction'].shape[0] == batch_size
+        assert output_dict['task_prediction'].shape[0] == batch_size  # (n_seqs, seq_len, n_tasks)
+        assert len(output_dict['task_prediction'].shape) == 3
+
+    # compute losses
+    batch_ext = {}
+    for key, val in batch.items():
+        if isinstance(val, torch.Tensor):
+            batch_ext[key] = val.unsqueeze(0)  # add batch dim
+        else:
+            batch_ext[key] = val
+
+    loss_dict = model.training_step(batch_ext, accumulate_grad=False)
+    assert 'loss' in loss_dict

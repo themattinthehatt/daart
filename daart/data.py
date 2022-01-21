@@ -27,7 +27,7 @@ from typeguard import typechecked
 
 
 __all__ = [
-    'split_trials', 'compute_batches', 'compute_batch_pad', 'SingleDataset', 'DataGenerator',
+    'split_trials', 'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'DataGenerator',
 ]
 
 
@@ -104,24 +104,24 @@ def split_trials(
 
 
 @typechecked
-def compute_batches(
+def compute_sequences(
         data: Union[np.ndarray, list],
-        batch_size: int,
-        batch_pad: int = 0
+        sequence_length: int,
+        sequence_pad: int = 0
 ) -> list:
-    """Compute batches of temporally contiguous data points.
+    """Compute sequences of temporally contiguous data points.
 
-    Partial batches are not constructed; for example, if the number of time points is 24, and the
+    Partial sequences are not constructed; for example, if the number of time points is 24, and the
     batch size is 10, only the first 20 points will be returned (in two batches).
 
     Parameters
     ----------
     data : array-like or list
         data to batch, of shape (T, N) or (T,)
-    batch_size : int
+    sequence_length : int
         number of continguous values along dimension 0 to include per batch
-    batch_pad : int, optional
-        if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
+    sequence_pad : int, optional
+        if >0, add `sequence_pad` time points to the beginning/end of each sequence (to account for
         padding with convolution layers)
 
     Returns
@@ -136,23 +136,23 @@ def compute_batches(
         return data
 
     if len(data.shape) == 2:
-        batch_dims = (batch_size + 2 * batch_pad, data.shape[1])
+        batch_dims = (sequence_length + 2 * sequence_pad, data.shape[1])
     else:
-        batch_dims = (batch_size + 2 * batch_pad,)
+        batch_dims = (sequence_length + 2 * sequence_pad,)
 
-    n_batches = int(np.floor(data.shape[0] / batch_size))
+    n_batches = int(np.floor(data.shape[0] / sequence_length))
     batched_data = [np.zeros(batch_dims) for _ in range(n_batches)]
     for b in range(n_batches):
-        idx_beg = b * batch_size
-        idx_end = (b + 1) * batch_size
-        if batch_pad > 0:
+        idx_beg = b * sequence_length
+        idx_end = (b + 1) * sequence_length
+        if sequence_pad > 0:
             if idx_beg == 0:
                 # initial vals are zeros; rest are real data
-                batched_data[b][batch_pad:] = data[idx_beg:idx_end + batch_pad]
-            elif (idx_end + batch_pad) > data.shape[0]:
-                batched_data[b][:-batch_pad] = data[idx_beg - batch_pad:idx_end]
+                batched_data[b][sequence_pad:] = data[idx_beg:idx_end + sequence_pad]
+            elif (idx_end + sequence_pad) > data.shape[0]:
+                batched_data[b][:-sequence_pad] = data[idx_beg - sequence_pad:idx_end]
             else:
-                batched_data[b] = data[idx_beg - batch_pad:idx_end + batch_pad]
+                batched_data[b] = data[idx_beg - sequence_pad:idx_end + sequence_pad]
         else:
             batched_data[b] = data[idx_beg:idx_end]
 
@@ -160,7 +160,7 @@ def compute_batches(
 
 
 @typechecked
-def compute_batch_pad(hparams: dict) -> int:
+def compute_sequence_pad(hparams: dict) -> int:
     """Compute padding needed to account for convolutions.
 
     Parameters
@@ -206,8 +206,8 @@ class SingleDataset(data.Dataset):
             paths: List[Union[str, None]],
             device: str = 'cuda',
             as_numpy: bool = False,
-            batch_size: int = 100,
-            batch_pad: int = 0,
+            sequence_length: int = 500,
+            sequence_pad: int = 0,
             input_type: str = 'markers'
     ) -> None:
         """
@@ -228,11 +228,11 @@ class SingleDataset(data.Dataset):
         device : str, optional
             location of data; options are
             'cpu' | 'cuda'
-        batch_size : int, optional
-            number of contiguous data points in each batch
-        batch_pad : int, optional
-            if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
-            padding with convolution layers)
+        sequence_length : int, optional
+            number of contiguous data points in a sequence
+        sequence_pad : int, optional
+            if >0, add `sequence_pad` time points to the beginning/end of each sequence (to account
+            for padding with convolution layers)
         input_type : str, optional
             'markers' | 'features'
 
@@ -252,9 +252,9 @@ class SingleDataset(data.Dataset):
             self.paths[signal] = path
             self.dtypes[signal] = None  # update when loading data
 
-        self.batch_pad = batch_pad
-        self.load_data(batch_size, input_type)
-        self.n_trials = len(self.data[signals[0]])
+        self.sequence_pad = sequence_pad
+        self.load_data(sequence_length, input_type)
+        self.n_sequences = len(self.data[signals[0]])
 
         # meta data about train/test/xv splits; set by DataGenerator
         self.batch_idxs = None
@@ -274,7 +274,7 @@ class SingleDataset(data.Dataset):
 
     @typechecked
     def __len__(self) -> int:
-        return self.n_trials
+        return self.n_sequences
 
     @typechecked
     def __getitem__(self, idx: Union[int, np.int64, None]) -> dict:
@@ -314,13 +314,13 @@ class SingleDataset(data.Dataset):
         return sample
 
     @typechecked
-    def load_data(self, batch_size: int, input_type: str) -> None:
+    def load_data(self, sequence_length: int, input_type: str) -> None:
         """Load all data into memory.
 
         Parameters
         ----------
-        batch_size : int
-            batch size of data
+        sequence_length : int
+            number of contiguous data points in a sequence
         input_type : str
             'markers' | 'features'
 
@@ -396,7 +396,7 @@ class SingleDataset(data.Dataset):
                     # if no path given, assume same size as markers and set all to background
                     if 'markers' in self.data.keys():
                         data_curr = np.zeros(
-                            (len(self.data['markers']) * batch_size,), dtype=np.int)
+                            (len(self.data['markers']) * sequence_length,), dtype=np.int)
                     else:
                         raise FileNotFoundError(
                             'Could not load "labels_strong" from None file without markers')
@@ -436,7 +436,7 @@ class SingleDataset(data.Dataset):
                 data_curr = self.transforms[signal](data_curr)
 
             # compute batches of temporally contiguous data points
-            data_curr = compute_batches(data_curr, batch_size, self.batch_pad)
+            data_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)
 
             self.data[signal] = data_curr
 
@@ -462,10 +462,11 @@ class DataGenerator(object):
             rng_seed: int = 0,
             trial_splits: Union[str, dict, None] = None,
             train_frac: float = 1.0,
-            batch_size: int = 100,
+            sequence_length: int = 500,
+            batch_size: int = 1,
             num_workers: int = 0,
             pin_memory: bool = False,
-            batch_pad: int = 0,
+            sequence_pad: int = 0,
             input_type: str = 'markers'
     ) -> None:
         """
@@ -493,21 +494,24 @@ class DataGenerator(object):
             if `0 < train_frac < 1.0`, defines the fraction of assigned training trials to
             actually use; if `train_frac > 1.0`, defines the number of assigned training trials to
             actually use
+        sequence_length : int, optional
+            number of contiguous data points in a sequence
         batch_size : int, optional
-            number of contiguous data points in each batch
+            number of sequences in each batch
         num_workers : int, optional
             number of cpu cores per dataset; defaults to 0 (all data loaded in main process)
         pin_memory : bool, optional
             if True, the data loader automatically pulls fetched data Tensors in pinned memory, and
             thus enables faster transfer to CUDA-enabled GPUs
-        batch_pad : int, optional
-            if >0, add `batch_pad` time points to the beginning/end of each batch (to account for
-            padding with convolution layers)
+        sequence_pad : int, optional
+            if >0, add `sequence_pad` time points to the beginning/end of each sequence (to account
+            for padding with convolution layers)
         input_type : str, optional
             'markers' | 'features'
 
         """
         self.ids = ids_list
+        self.batch_size = batch_size
         self.as_numpy = as_numpy
         self.device = device
 
@@ -519,8 +523,8 @@ class DataGenerator(object):
                 ids_list, signals_list, transforms_list, paths_list):
             self.datasets.append(SingleDataset(
                 id=id, signals=signals, transforms=transforms, paths=paths, device=device,
-                as_numpy=self.as_numpy, batch_size=batch_size, batch_pad=batch_pad,
-                input_type=input_type))
+                as_numpy=self.as_numpy, sequence_length=sequence_length,
+                sequence_pad=sequence_pad, input_type=input_type))
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
@@ -564,10 +568,15 @@ class DataGenerator(object):
         self.batch_ratios = np.array(self.batch_ratios) / np.sum(self.batch_ratios)
 
         # find total number of batches per data type; this will be iterated over in the train loop
+        # automatically set val/test batch sizes to 1 for more fine-grained logging
         self.n_tot_batches = {}
         for dtype in self._dtypes:
-            self.n_tot_batches[dtype] = np.sum(
-                [dataset.n_batches[dtype] for dataset in self.datasets])
+            if dtype == 'train':
+                self.n_tot_batches[dtype] = int(np.ceil(np.sum(
+                    [dataset.n_batches[dtype] for dataset in self.datasets]) / self.batch_size))
+            else:
+                self.n_tot_batches[dtype] = np.sum(
+                    [dataset.n_batches[dtype] for dataset in self.datasets])
 
         # create data loaders (will shuffle/batch/etc datasets)
         self.dataset_loaders = [None] * self.n_datasets
@@ -576,7 +585,7 @@ class DataGenerator(object):
             for dtype in self._dtypes:
                 self.dataset_loaders[i][dtype] = torch.utils.data.DataLoader(
                     dataset,
-                    batch_size=1,
+                    batch_size=1,  # keep 1 here so we can combine batches from multiple datasets
                     sampler=SubsetRandomSampler(dataset.batch_idxs[dtype]),
                     num_workers=num_workers,
                     pin_memory=pin_memory)
@@ -637,23 +646,55 @@ class DataGenerator(object):
             - dataset (int): dataset from which data batch is drawn
 
         """
+        empty_datasets = np.zeros(self.n_datasets)
+
+        # automatically set val/test batch sizes to 1 for more fine-grained logging
+        n_batches = self.batch_size if dtype == 'train' else 1
+
+        n_sequences = 0
+        sequences = []
+        datasets = []
+
         while True:
+
             # get next dataset
             dataset = np.random.choice(np.arange(self.n_datasets), p=self.batch_ratios)
 
-            # get this dataset data
+            # get sequence from this dataset
             try:
-                sample = next(self.dataset_iters[dataset][dtype])
-                break
+                sequence = next(self.dataset_iters[dataset][dtype])
+                # add sequence to batch
+                sequences.append(sequence)
+                datasets.append(dataset)
+                n_sequences += 1
+                # exit loop if we have enough batches
+                if n_sequences == n_batches:
+                    break
             except StopIteration:
-                continue
+                # record dataset as being empty
+                empty_datasets[dataset] = 1
+                # leave loop if all datasets are empty; otherwise, continue collecting sequences
+                if np.all(empty_datasets):
+                    break
+                else:
+                    continue
 
+        batch = OrderedDict()
         if self.as_numpy:
-            for i, signal in enumerate(sample):
+            for i, signal in enumerate(sequences[0]):
                 if signal != 'batch_idx':
-                    sample[signal] = [ss.cpu().detach().numpy() for ss in sample[signal]]
+                    batch[signal] = np.row_stack(
+                        [s[signal].cpu().detach().numpy() for s in sequences])
+                else:
+                    batch['batch_idx'] = [ss['batch_idx'] for ss in sequences]
         else:
-            if self.device == 'cuda':
-                sample = {key: val.to('cuda') for key, val in sample.items()}
+            for i, signal in enumerate(sequences[0]):
+                if signal != 'batch_idx':
+                    batch[signal] = torch.vstack([s[signal] for s in sequences])
+                else:
+                    batch['batch_idx'] = torch.vstack([s['batch_idx'] for s in sequences])
 
-        return sample, dataset
+            if self.device == 'cuda':
+                batch = {key: val.to('cuda') for key, val in batch.items()}
+
+        return batch, datasets

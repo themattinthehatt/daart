@@ -84,7 +84,7 @@ class Logger(object):
             self,
             dtype: str,
             loss_dict: dict,
-            dataset: Union[int, np.int64, None] = None
+            dataset: Union[int, np.int64, list, None] = None
     ) -> None:
         """Update metrics for a specific dtype/dataset.
 
@@ -110,11 +110,17 @@ class Logger(object):
             # update aggregate methods
             self.metrics[dtype][key] += val
 
-            # update separated metrics
+            # update separated metrics if dataset exists and is integer or list of length 1
             if dataset is not None and self.n_datasets > 1:
-                if key not in self.metrics_by_dataset[dataset][dtype]:
-                    self.metrics_by_dataset[dataset][dtype][key] = 0
-                self.metrics_by_dataset[dataset][dtype][key] += val
+                if isinstance(dataset, list) and len(dataset) > 1:
+                    continue
+                elif isinstance(dataset, list) and len(dataset) == 1:
+                    dataset_ = dataset[0]
+                else:
+                    dataset_ = dataset
+                if key not in self.metrics_by_dataset[dataset_][dtype]:
+                    self.metrics_by_dataset[dataset_][dtype][key] = 0
+                self.metrics_by_dataset[dataset_][dtype][key] += val
 
     @typechecked
     def create_metric_row(
@@ -166,7 +172,8 @@ class Logger(object):
         metric_row = {
             'epoch': epoch,
             'batch': batch,
-            'trial': trial}
+            'trial': trial
+        }
 
         if dtype == 'val':
             metric_row['best_val_epoch'] = best_epoch
@@ -360,11 +367,11 @@ class Trainer(object):
                 optimizer.zero_grad()
 
                 # get next minibatch and put it on the device
-                data, dataset = data_generator.next_batch('train')
+                data, datasets = data_generator.next_batch('train')
 
                 # call the appropriate loss function
-                loss_dict = model.training_step(data, dataset=dataset, accumulate_grad=True)
-                logger.update_metrics('train', loss_dict, dataset=dataset)
+                loss_dict = model.training_step(data, accumulate_grad=True)
+                logger.update_metrics('train', loss_dict, dataset=datasets)
 
                 # step (evaluate untrained network on epoch 0)
                 if i_epoch > 0:
@@ -381,12 +388,11 @@ class Trainer(object):
 
                     for i_val in range(data_generator.n_tot_batches['val']):
                         # get next minibatch and put it on the device
-                        data, dataset = data_generator.next_batch('val')
+                        data, datasets = data_generator.next_batch('val')
 
                         # call the appropriate loss function
-                        loss_dict = model.training_step(
-                            data, dataset=dataset, accumulate_grad=False)
-                        logger.update_metrics('val', loss_dict, dataset=dataset)
+                        loss_dict = model.training_step(data, accumulate_grad=False)
+                        logger.update_metrics('val', loss_dict, dataset=datasets)
 
                     # save best val model
                     if logger.get_loss('val') < best_val_loss:
@@ -399,7 +405,7 @@ class Trainer(object):
                     logger.create_metric_row(
                         dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
                         by_dataset=False, best_epoch=best_val_epoch)
-                    # export individual dataset metrics on val data
+                    # export individual dataset metrics on val data if possible
                     if data_generator.n_datasets > 1:
                         for dataset in range(data_generator.n_datasets):
                             logger.create_metric_row(
@@ -414,11 +420,11 @@ class Trainer(object):
                 dtype='train', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
                 by_dataset=False, best_epoch=best_val_epoch)
             # export individual dataset metrics on train/val data
-            if data_generator.n_datasets > 1:
+            if data_generator.n_datasets > 1 and data_generator.batch_size == 1:
                 for dataset in range(data_generator.n_datasets):
                     logger.create_metric_row(
-                        dtype='train', epoch=i_epoch, batch=i_batch, dataset=dataset, trial=-1,
-                        by_dataset=True, best_epoch=best_val_epoch)
+                        dtype='train', epoch=i_epoch, batch=i_batch, dataset=dataset,
+                        trial=-1, by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
             # run end-of-epoch callbacks
@@ -453,16 +459,17 @@ class Trainer(object):
         model.eval()
         for i_test in range(data_generator.n_tot_batches['test']):
             # get next minibatch and put it on the device
-            data, dataset = data_generator.next_batch('test')
+            data, datasets = data_generator.next_batch('test')
 
             # call the appropriate loss function
             logger.reset_metrics('test')
-            loss_dict = model.training_step(data, dataset=dataset, accumulate_grad=False)
-            logger.update_metrics('test', loss_dict, dataset=dataset)
+            loss_dict = model.training_step(data, dataset=datasets, accumulate_grad=False)
+            logger.update_metrics('test', loss_dict, dataset=datasets)
 
             # calculate metrics for each *batch* (rather than whole dataset)
             logger.create_metric_row(
-                'test', i_epoch, i_test, dataset, trial=data['batch_idx'].item(), by_dataset=True)
+                'test', i_epoch, i_test, datasets[0], trial=data['batch_idx'][0].item(),
+                by_dataset=True)
 
         # save out hparams
         if save_path is not None:

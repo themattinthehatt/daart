@@ -132,6 +132,7 @@ def get_model_params(hparams: dict) -> dict:
         'trial_splits': hparams['trial_splits'],
         'train_frac': hparams['train_frac'],
         'model_type': hparams['model_type'],
+        'sequence_length': hparams['sequence_length'],
         'batch_size': hparams['batch_size'],
         'lambda_weak': hparams['lambda_weak'],
         'lambda_strong': hparams['lambda_strong'],

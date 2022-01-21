@@ -172,7 +172,21 @@ class Segmenter(BaseModel):
             raise ValueError('"%s" is not a valid model type' % self.hparams['model_type'])
 
     def forward(self, x):
-        """Process input data."""
+        """Process input data.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            input data of shape (n_sequences, sequence_length, n_markers)
+
+        Returns
+        -------
+        dict of model outputs/internals as torch tensors
+            - labels
+            - prediction
+            - embedding
+
+        """
         return self.model(x)
 
     def predict_labels(self, data_generator, return_scores=False, remove_pad=True):
@@ -199,7 +213,7 @@ class Segmenter(BaseModel):
         """
         self.eval()
 
-        pad = self.hparams.get('batch_pad', 0)
+        pad = self.hparams.get('sequence_pad', 0)
 
         softmax = nn.Softmax(dim=1)
 
@@ -214,36 +228,37 @@ class Segmenter(BaseModel):
         # predictions on regression task
         task_predictions = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
-            labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
-            scores[sess] = [np.array([]) for _ in range(dataset.n_trials)]
-            embedding[sess] = [np.array([]) for _ in range(dataset.n_trials)]
-            task_predictions[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            labels[sess] = [np.array([]) for _ in range(dataset.n_sequences)]
+            scores[sess] = [np.array([]) for _ in range(dataset.n_sequences)]
+            embedding[sess] = [np.array([]) for _ in range(dataset.n_sequences)]
+            task_predictions[sess] = [np.array([]) for _ in range(dataset.n_sequences)]
 
         # partially fill container (gap trials will be included as nans)
         dtypes = ['train', 'val', 'test']
         for dtype in dtypes:
             data_generator.reset_iterators(dtype)
             for i in range(data_generator.n_tot_batches[dtype]):
-                data, sess = data_generator.next_batch(dtype)
-                predictors = data['markers'][0]
-                # targets = data['labels'][0]
-                batch_idx = data['batch_idx'].item()
+                data, sess_list = data_generator.next_batch(dtype)
+                predictors = data['markers']
                 outputs_dict = self.model(predictors)
                 # remove padding if necessary
                 if pad > 0 and remove_pad:
                     for key, val in outputs_dict.items():
-                        outputs_dict[key] = val[pad:-pad] if val is not None else None
-                # push through log-softmax, since this is included in the loss and not model
-                labels[sess][batch_idx] = \
-                    softmax(outputs_dict['labels']).cpu().detach().numpy()
-                embedding[sess][batch_idx] = \
-                    outputs_dict['embedding'].cpu().detach().numpy()
-                if return_scores:
-                    scores[sess][batch_idx] = \
-                        outputs_dict['labels'].cpu().detach().numpy()
-                if outputs_dict.get('task_prediction', None) is not None:
-                    task_predictions[sess][batch_idx] = \
-                        outputs_dict['labels'].cpu().detach().numpy()
+                        outputs_dict[key] = val[:, pad:-pad] if val is not None else None
+                # loop over sequences in batch
+                for s, sess in enumerate(sess_list):
+                    batch_idx = data['batch_idx'][s].item()
+                    # push through log-softmax, since this is included in the loss and not model
+                    labels[sess][batch_idx] = \
+                        softmax(outputs_dict['labels'][s]).cpu().detach().numpy()
+                    embedding[sess][batch_idx] = \
+                        outputs_dict['embedding'][s].cpu().detach().numpy()
+                    if return_scores:
+                        scores[sess][batch_idx] = \
+                            outputs_dict['labels'][s].cpu().detach().numpy()
+                    if outputs_dict.get('task_prediction', None) is not None:
+                        task_predictions[sess][batch_idx] = \
+                            outputs_dict['labels'][s].cpu().detach().numpy()
 
         return {
             'labels': labels,
@@ -262,7 +277,7 @@ class Segmenter(BaseModel):
         Parameters
         ----------
         data : dict
-            signals are of shape (1, time, n_channels)
+            signals are of shape (n_sequences, sequence_length, n_channels)
         accumulate_grad : bool, optional
             accumulate gradient for training step
 
@@ -281,43 +296,47 @@ class Segmenter(BaseModel):
         lambda_task = self.hparams.get('lambda_task', 0)
 
         # index padding for convolutions
-        pad = self.hparams.get('batch_pad', 0)
+        pad = self.hparams.get('sequence_pad', 0)
 
         # push data through model
-        markers_wpad = data['markers'][0]
+        markers_wpad = data['markers']
         outputs_dict = self.model(markers_wpad)
 
-        # get masks that define where strong labels are
+        # remove padding from supplied data
         if lambda_strong > 0:
             if pad > 0:
-                labels_strong = data['labels_strong'][0][pad:-pad]
+                labels_strong = data['labels_strong'][:, pad:-pad, ...]
             else:
-                labels_strong = data['labels_strong'][0]
+                labels_strong = data['labels_strong']
+            # reshape to fit into class loss; needs to be (n_examples,)
+            labels_strong = torch.flatten(labels_strong)
         else:
             labels_strong = None
 
         if lambda_weak > 0:
             if pad > 0:
-                labels_weak = data['labels_weak'][0][pad:-pad]
+                labels_weak = data['labels_weak'][:, pad:-pad, ...]
             else:
-                labels_weak = data['labels_weak'][0]
+                labels_weak = data['labels_weak']
+            # reshape to fit into class loss; needs to be (n_examples,)
+            labels_weak = torch.flatten(labels_weak)
         else:
             labels_weak = None
 
         if lambda_task > 0:
             if pad > 0:
-                tasks = data['tasks'][0][pad:-pad]
+                tasks = data['tasks'][:, pad:-pad, ...]
             else:
-                tasks = data['tasks'][0]
+                tasks = data['tasks']
         else:
             tasks = None
 
-        # remove padding from other tensors
+        # remove padding from model output
         if pad > 0:
-            markers = markers_wpad[pad:-pad]
+            markers = markers_wpad[:, pad:-pad, ...]
             # remove padding from model output
             for key, val in outputs_dict.items():
-                outputs_dict[key] = val[pad:-pad] if val is not None else None
+                outputs_dict[key] = val[:, pad:-pad, ...] if val is not None else None
         else:
             markers = markers_wpad
 
@@ -329,19 +348,21 @@ class Segmenter(BaseModel):
         # compute loss on weak labels
         # ------------------------------------
         if lambda_weak > 0:
+            # reshape predictions to fit into class loss; needs to be (n_examples, n_classes)
+            labels_weak_reshape = torch.reshape(
+                outputs_dict['labels_weak'], (-1, outputs_dict['labels_weak'].shape[-1]))
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
                 loss_weak = self.class_loss(
-                    outputs_dict['labels_weak'][labels_strong == 0],
-                    labels_weak[labels_strong == 0])
+                    labels_weak_reshape[labels_strong == 0], labels_weak[labels_strong == 0])
             else:
-                loss_weak = self.class_loss(outputs_dict['labels_weak'], labels_weak)
+                loss_weak = self.class_loss(labels_weak_reshape, labels_weak)
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
             # compute fraction correct on weak labels
             fc = accuracy_score(
-                labels_weak.cpu().detach().numpy(),
-                np.argmax(outputs_dict['labels'].cpu().detach().numpy(), axis=1)
+                labels_weak.cpu().detach().numpy().flatten(),
+                np.argmax(outputs_dict['labels'].cpu().detach().numpy(), axis=2).flatten(),
             )
             # log
             loss_dict['loss_weak'] = loss_weak_val
@@ -351,7 +372,10 @@ class Segmenter(BaseModel):
         # compute loss on strong labels
         # ------------------------------------
         if lambda_strong > 0:
-            loss_strong = self.class_loss(outputs_dict['labels'], labels_strong)
+            # reshape predictions to fit into class loss; needs to be (n_examples, n_classes)
+            labels_strong_reshape = torch.reshape(
+                outputs_dict['labels'], (-1, outputs_dict['labels'].shape[-1]))
+            loss_strong = self.class_loss(labels_strong_reshape, labels_strong)
             loss += lambda_strong * loss_strong
             loss_strong_val = loss_strong.item()
             # log
@@ -361,7 +385,7 @@ class Segmenter(BaseModel):
         # compute loss on one-step predictions
         # ------------------------------------
         if lambda_pred > 0:
-            loss_pred = self.pred_loss(markers[1:], outputs_dict['prediction'][:-1])
+            loss_pred = self.pred_loss(markers[:, 1:], outputs_dict['prediction'][:, :-1])
             loss += lambda_pred * loss_pred
             loss_pred_val = loss_pred.item()
             # log
@@ -375,8 +399,8 @@ class Segmenter(BaseModel):
             loss += lambda_task * loss_task
             loss_task_val = loss_task.item()
             r2 = r2_score(
-                tasks.cpu().detach().numpy(),
-                outputs_dict['task_prediction'].cpu().detach().numpy()
+                tasks.cpu().detach().numpy().flatten(),
+                outputs_dict['task_prediction'].cpu().detach().numpy().flatten(),
             )
             # log
             loss_dict['loss_task'] = loss_task_val

@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 import torch
 
-from daart.data import split_trials, compute_batches
+from daart.data import split_trials, compute_sequences
 from daart.utils import build_data_generator
 
 
@@ -49,11 +49,11 @@ def test_split_trials():
     assert not np.any(splits['test'] == max_val + 1)
 
 
-def test_compute_batches():
+def test_compute_sequences():
 
     # pass already batched data (in a list) through without modification
     data = [1, 2, 3]
-    batch_data = compute_batches(data, batch_size=10)
+    batch_data = compute_sequences(data, sequence_length=10)
     assert data == batch_data
 
     # batch sizes and quantity are correct
@@ -61,7 +61,7 @@ def test_compute_batches():
     N = 4
     B = 5
     data = np.random.randn(T, N)
-    batch_data = compute_batches(data, batch_size=B)
+    batch_data = compute_sequences(data, sequence_length=B)
     assert len(batch_data) == T // B
     assert batch_data[0].shape == (B, N)
     assert np.all(batch_data[0] == data[:B, :])
@@ -100,9 +100,9 @@ def test_data_generator(hparams, data_generator):
     assert len(data_generator) == n_datasets
 
     # make sure batch sizes are good
-    batch, dataset = data_generator.next_batch('train')
+    batch, datasets = data_generator.next_batch('train')
 
-    assert dataset < n_datasets
+    assert np.all(np.array(datasets) < n_datasets)
 
     assert isinstance(batch, dict)
     assert 'markers' in batch.keys()
@@ -111,6 +111,8 @@ def test_data_generator(hparams, data_generator):
         if key != 'batch_idx':
             # make sure all data tensors have the same batch dimension
             assert val.shape[0] == batch['markers'].shape[0]
+            # make sure all data tensors have the same sequence dimension
+            assert val.shape[1] == batch['markers'].shape[1]
 
     # make sure batches are torch tensors
     assert isinstance(batch['markers'], torch.Tensor)

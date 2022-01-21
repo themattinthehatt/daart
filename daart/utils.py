@@ -3,7 +3,7 @@
 import logging
 import os
 
-from daart.data import compute_batch_pad, DataGenerator
+from daart.data import compute_sequence_pad, DataGenerator
 from daart.transforms import ZScore
 
 
@@ -74,13 +74,14 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         paths.append(paths_curr)
 
     # compute padding needed to account for convolutions
-    hparams['batch_pad'] = compute_batch_pad(hparams)
+    hparams['sequence_pad'] = compute_sequence_pad(hparams)
 
     # build data generator
     data_gen = DataGenerator(
         hparams['expt_ids'], signals, transforms, paths, device=hparams['device'],
-        batch_size=hparams['batch_size'], trial_splits=hparams['trial_splits'],
-        train_frac=hparams['train_frac'], batch_pad=hparams['batch_pad'],
+        sequence_length=hparams['sequence_length'], sequence_pad=hparams['sequence_pad'],
+        batch_size=hparams['batch_size'],
+        trial_splits=hparams['trial_splits'], train_frac=hparams['train_frac'],
         input_type=hparams.get('input_type', 'markers'))
 
     # automatically compute input/output sizes from data

@@ -102,12 +102,12 @@ def train_model(hparams):
     # save training curves
     if hparams.get('plot_train_curves', False):
         plot_training_curves(
-            os.path.join(model_save_path, 'metrics.csv'), dtype='train',
+            os.path.join(hparams['tt_version_dir'], 'metrics.csv'), dtype='train',
             expt_ids=hparams['expt_ids'],
             save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
             format='png')
         plot_training_curves(
-            os.path.join(model_save_path, 'metrics.csv'), dtype='val',
+            os.path.join(hparams['tt_version_dir'], 'metrics.csv'), dtype='val',
             expt_ids=hparams['expt_ids'],
             save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
             format='png')
