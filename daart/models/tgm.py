@@ -7,7 +7,7 @@ from torch import nn
 from daart.models.base import BaseModel
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['TGM']
+__all__ = []
 
 
 class TGM(BaseModel):

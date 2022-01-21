@@ -1,5 +1,6 @@
 """Utility functions for daart package."""
 
+import logging
 import os
 
 from daart.data import compute_batch_pad, DataGenerator
@@ -31,8 +32,9 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         if not os.path.exists(markers_file):
             markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.npy')
         if not os.path.exists(markers_file):
-            raise FileNotFoundError(
-                'could not find marker file for %s at %s' % (expt_id, markers_file))
+            msg = 'could not find marker file for %s at %s' % (expt_id, markers_file)
+            logging.info(msg)
+            raise FileNotFoundError(msg)
         signals_curr.append('markers')
         transforms_curr.append(ZScore())
         paths_curr.append(markers_file)
