@@ -41,8 +41,14 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
         # hand labels
         if hparams.get('lambda_strong', 0) > 0:
-            hand_labels_file = os.path.join(
-                hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
+            if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
+                hand_labels_file = None
+            else:
+                hand_labels_file = os.path.join(
+                    hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
+                if not os.path.exists(hand_labels_file):
+                    logging.warning('did not find hand labels file for %s' % expt_id)
+                    hand_labels_file = None
             signals_curr.append('labels_strong')
             transforms_curr.append(None)
             paths_curr.append(hand_labels_file)
@@ -57,8 +63,7 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
         # tasks
         if hparams.get('lambda_task', 0) > 0:
-            tasks_labels_file = os.path.join(
-                hparams['data_dir'], 'tasks', expt_id + '.csv')
+            tasks_labels_file = os.path.join(hparams['data_dir'], 'tasks', expt_id + '.csv')
             signals_curr.append('tasks')
             transforms_curr.append(ZScore())
             paths_curr.append(tasks_labels_file)
