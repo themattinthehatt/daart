@@ -182,9 +182,16 @@ class Segmenter(BaseModel):
         Returns
         -------
         dict of model outputs/internals as torch tensors
-            - labels
-            - prediction
-            - embedding
+            - 'labels' (torch.Tensor): model classification
+               shape of (n_sequences, sequence_length, n_classes)
+            - 'labels_weak' (torch.Tensor): model classification of weak/pseudo labels
+              shape of (n_sequences, sequence_length, n_classes)
+            - 'prediction' (torch.Tensor): one-step-ahead prediction
+              shape of (n_sequences, sequence_length, n_markers)
+            - 'task_prediction' (torch.Tensor): prediction of regression tasks
+              (n_sequences, sequence_length, n_tasks)
+            - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
+              shape of (n_sequences, sequence_length, embedding_dim)
 
         """
         return self.model(x)
@@ -239,8 +246,7 @@ class Segmenter(BaseModel):
             data_generator.reset_iterators(dtype)
             for i in range(data_generator.n_tot_batches[dtype]):
                 data, sess_list = data_generator.next_batch(dtype)
-                predictors = data['markers']
-                outputs_dict = self.model(predictors)
+                outputs_dict = self.model(data['markers'])
                 # remove padding if necessary
                 if pad > 0 and remove_pad:
                     for key, val in outputs_dict.items():
@@ -359,14 +365,15 @@ class Segmenter(BaseModel):
                 loss_weak = self.class_loss(labels_weak_reshape, labels_weak)
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
-            # compute fraction correct on weak labels
-            fc = accuracy_score(
-                labels_weak.cpu().detach().numpy().flatten(),
-                np.argmax(outputs_dict['labels'].cpu().detach().numpy(), axis=2).flatten(),
-            )
-            # log
             loss_dict['loss_weak'] = loss_weak_val
-            loss_dict['fc'] = fc
+            # compute fraction correct on weak labels
+            if 'labels' in outputs_dict.keys():
+                fc = accuracy_score(
+                    labels_weak.cpu().detach().numpy().flatten(),
+                    np.argmax(outputs_dict['labels'].cpu().detach().numpy(), axis=2).flatten(),
+                )
+                # log
+                loss_dict['fc'] = fc
 
         # ------------------------------------
         # compute loss on strong labels
@@ -447,52 +454,48 @@ class Ensembler(object):
         # initialize container for labels
         labels = [[] for _ in range(data_generator.n_datasets)]
         for sess, dataset in enumerate(data_generator.datasets):
-            labels[sess] = [np.array([]) for _ in range(dataset.n_trials)]
+            labels[sess] = [np.array([]) for _ in range(dataset.n_sequences)]
 
-        # partially fill container (gap trials will be included as nans)
-        dtypes = ['train', 'val', 'test']
-        for dtype in dtypes:
-            data_generator.reset_iterators(dtype)
-            for i in range(data_generator.n_tot_batches[dtype]):
-                data, sess = data_generator.next_batch(dtype)
-                predictors = data['markers'][0]
-                labels_curr = []
-                for model in self.models:
-                    outputs_dict = model(predictors)
-                    # remove padding if necessary
-                    if model.hparams.get('batch_pad', 0) > 0:
-                        for key, val in outputs_dict.items():
-                            outputs_dict[key] = val[pad:-pad] if val is not None else None
-                    labels_tmp = outputs_dict['labels'].cpu().detach().numpy()
-                    if combine_before_softmax:
-                        labels_curr.append(labels_tmp[None, ...])
-                    else:
-                        labels_curr.append(scipy_softmax(labels_tmp, axis=1)[None, ...])
+        # process data for each model
+        labels_all = []
+        for model in self.models:
+            outputs_curr = model.predict_labels(
+                data_generator, return_scores=combine_before_softmax)
+            if combine_before_softmax:
+                labels_all.append(outputs_curr['scores'])
+            else:
+                labels_all.append(outputs_curr['labels'])
+        # labels_all is a list of list of lists
+        # access: labels_all[idx_model][idx_dataset][idx_batch]
+
+        # ensemble prediction across models
+        for sess, labels_sess in enumerate(labels):
+            for batch, labels_batch in enumerate(labels_sess):
+
+                # labels_curr is of shape (n_models, sequence_len, n_classes)
+                labels_curr = np.vstack(l[sess][batch][None, ...] for l in labels_all)
 
                 # combine predictions across models
                 if weights is None:
                     # simple average across models
-                    labels_curr = np.mean(np.vstack(labels_curr), axis=0)
+                    labels_curr = np.mean(labels_curr, axis=0)
                 elif isinstance(weights, str) and weights == 'entropy':
-                    # weight each model at each time point by inverse entropy of distribution so
-                    # that more confident models have a higher weight
-                    labels_tmp = np.vstack(labels_curr)
+                    # weight each model at each time point by inverse entropy of distribution
+                    # so that more confident models have a higher weight
                     # compute entropy across labels
-                    ent = entropy(labels_tmp, axis=2)
+                    ent = entropy(labels_curr, axis=-1)
                     # low entropy = high confidence, weight these more
                     w = 1.0 / ent
                     # normalize over models
-                    w /= np.sum(w, axis=0)
-                    labels_curr = np.mean(labels_tmp * w[:, :, None], axis=0)
+                    w /= np.sum(w, axis=0)  # shape of (n_models, sequence_len)
+                    labels_curr = np.mean(labels_curr * w[..., None], axis=0)
                 elif isinstance(weights, (list, tuple, np.ndarray)):
                     # weight each model according to user-supplied weights
-                    labels_curr = np.average(np.vstack(labels_curr), axis=0, weights=weights)
+                    labels_curr = np.average(labels_curr, axis=0, weights=weights)
 
-                # store predictions
                 if combine_before_softmax:
-                    # push through softmax
-                    labels[sess][data['batch_idx'].item()] = scipy_softmax(labels_curr, axis=1)
+                    labels[sess][batch] = scipy_softmax(labels_curr, axis=-1)
                 else:
-                    labels[sess][data['batch_idx'].item()] = labels_curr
+                    labels[sess][batch] = labels_curr
 
         return {'labels': labels}

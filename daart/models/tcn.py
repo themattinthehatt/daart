@@ -405,7 +405,7 @@ class DilatedTCN(BaseModel):
         -------
         dict
             - 'labels' (torch.Tensor): model classification
-            - 'labels' (torch.Tensor): model classification of weak/pseudo labels
+            - 'labels_weak' (torch.Tensor): model classification of weak/pseudo labels
             - 'prediction' (torch.Tensor): one-step-ahead prediction
             - 'task_prediction' (torch.Tensor): prediction of regression tasks
             - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
