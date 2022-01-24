@@ -188,6 +188,8 @@ def compute_sequence_pad(hparams: dict) -> int:
         pad = 4
     elif hparams['model_type'].lower() == 'tgm':
         raise NotImplementedError
+    elif hparam['model_type'].lower() == 'random-forest':
+        pad = 0
     else:
         raise ValueError('"%s" is not a valid model type' % hparams['model_type'])
 
