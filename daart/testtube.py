@@ -20,7 +20,7 @@ def get_all_params():
         raise ValueError('No command line arguments allowed other than config file names')
 
     def add_to_parser(parser, arg_name, value):
-        if arg_name == 'expt_ids':
+        if arg_name == 'expt_ids' or arg_name == 'expt_ids_to_keep':
             # treat expt_ids differently, want to parse full lists as one
             if isinstance(value, list):
                 value = ';'.join(value)
