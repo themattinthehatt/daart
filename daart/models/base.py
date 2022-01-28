@@ -10,8 +10,31 @@ import torch
 from sklearn.metrics import accuracy_score, r2_score
 from torch import nn, save
 
+from daart import losses
+
 # to ignore imports for sphix-autoapidoc
-__all__ = ['BaseModel', 'Segmenter', 'Ensembler']
+__all__ = ['reparameterize_gaussian', 'BaseModel', 'Segmenter', 'Ensembler']
+
+
+def reparameterize_gaussian(mu, logvar):
+    """Sample from N(mu, var)
+
+    Parameters
+    ----------
+    mu : torch.Tensor
+        vector of mean parameters
+    logvar : torch.Tensor
+        vector of log variances; only mean field approximation is currently implemented
+
+    Returns
+    -------
+    torch.Tensor
+        sampled vector of shape (n_sequences, sequence_length, embedding_dim)
+
+    """
+    std = torch.exp(logvar)
+    eps = torch.randn_like(std)
+    return eps.mul(std).add_(mu)
 
 
 class BaseModel(nn.Module):
@@ -192,6 +215,13 @@ class Segmenter(BaseModel):
 
         # build encoder module
         self.model['encoder'] = Module(self.hparams, type='encoder')
+        if self.hparams.get('variational', False):
+            self.model['latent_mean'] = self._build_linear(
+                global_layer_num=len(self.model['encoder'].model), name='latent_mean',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['n_hid_units'])
+            self.model['latent_logvar'] = self._build_linear(
+                global_layer_num=len(self.model['encoder'].model), name='latent_logvar',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['n_hid_units'])
 
         # build decoder module
         if self.hparams.get('lambda_recon', 0) > 0:
@@ -241,50 +271,68 @@ class Segmenter(BaseModel):
             - 'task_prediction' (torch.Tensor): prediction of regression tasks
               (n_sequences, sequence_length, n_tasks)
             - 'embedding' (torch.Tensor): behavioral embedding used for classification/prediction
+              in non-variational models
+              shape of (n_sequences, sequence_length, embedding_dim)
+            - 'mean' (torch.Tensor): mean of appx posterior of latents in variational models
+              shape of (n_sequences, sequence_length, embedding_dim)
+            - 'logvar' (torch.Tensor): logvar of appx posterior of latents in variational models
+              shape of (n_sequences, sequence_length, embedding_dim)
+            - 'sample' (torch.Tensor): sample from appx posterior of latents in variational models
               shape of (n_sequences, sequence_length, embedding_dim)
 
         """
         # push data through encoder to get latent embedding
         # x = B x T x N (e.g. B = 2, T = 500, N = 16)
         x = self.model['encoder'](x)
+        if self.hparams.get('variational', False):
+            mean = self.model['latent_mean'](x)
+            logvar = self.model['latent_logvar'](x)
+            z = reparameterize_gaussian(mean, logvar)
+        else:
+            mean = x
+            logvar = None
+            z = x
 
         # push embedding through classifiers to get hand labels
         if self.hparams.get('lambda_strong', 0) > 0:
-            z = self.model['classifier'](x)
+            y = self.model['classifier'](z)
         else:
-            z = None
+            y = None
 
         # push embedding through linear layer to heuristic/pseudo labels
         if self.hparams.get('lambda_weak', 0) > 0:
-            z_weak = self.model['classifier_weak'](x)
+            y_weak = self.model['classifier_weak'](z)
         else:
-            z_weak = None
+            y_weak = None
 
         # push embedding through linear layer to get task predictions
         if self.hparams.get('lambda_task', 0) > 0:
-            w = self.model['task_predictor'](x)
+            w = self.model['task_predictor'](z)
         else:
             w = None
 
         # push embedding through decoder network to get data at current time point
         if self.hparams.get('lambda_recon', 0) > 0:
-            yt = self.model['decoder'](x)
+            xt = self.model['decoder'](z)
         else:
-            yt = None
+            xt = None
 
         # push embedding through predictor network to get data at subsequent time points
         if self.hparams.get('lambda_pred', 0) > 0:
-            ytp1 = self.model['predictor'](x)
+            xtp1 = self.model['predictor'](z)
         else:
-            ytp1 = None
+            xtp1 = None
 
         return {
-            'labels': z,  # (n_sequences, sequence_length, n_classes)
-            'labels_weak': z_weak,  # (n_sequences, sequence_length, n_classes)
-            'reconstruction': yt,  # (n_sequences, sequence_length, n_markers)
-            'prediction': ytp1,  # (n_sequences, sequence_length, n_markers)
+            'labels': y,  # (n_sequences, sequence_length, n_classes)
+            'labels_weak': y_weak,  # (n_sequences, sequence_length, n_classes)
+            'reconstruction': xt,  # (n_sequences, sequence_length, n_markers)
+            'prediction': xtp1,  # (n_sequences, sequence_length, n_markers)
             'task_prediction': w,  # (n_sequences, sequence_length, n_tasks)
-            'embedding': x,  # (n_sequences, sequence_length, embedding_dim)
+            'embedding': mean,  # (n_sequences, sequence_length, embedding_dim)
+            'latent_mean': mean,  # (n_sequences, sequence_length, embedding_dim)
+            'latent_logvar': logvar,  # (n_sequences, sequence_length, embedding_dim)
+            'sample': z,  # (n_sequences, sequence_length, embedding_dim)
         }
 
     def predict_labels(self, data_generator, return_scores=False, remove_pad=True):
@@ -503,6 +551,18 @@ class Segmenter(BaseModel):
             # log
             loss_dict['loss_task'] = loss_task_val
             loss_dict['task_r2'] = r2
+
+        # ------------------------------------
+        # compute kl divergence on appx posterior
+        # ------------------------------------
+        if self.hparams.get('variational', False):
+            # multiply by 2 to take into account the fact that we're computing raw mse for decoding
+            # and prediction rather than (1 / 2\sigma^2) * MSE
+            loss_kl = 2.0 * losses.kl_div_to_std_normal(
+                outputs_dict['latent_mean'], outputs_dict['latent_logvar'])
+            loss += loss_kl
+            # log
+            loss_dict['loss_kl'] = loss_kl.item()
 
         if accumulate_grad:
             loss.backward()

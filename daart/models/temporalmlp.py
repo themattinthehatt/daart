@@ -14,8 +14,24 @@ class TemporalMLP(BaseModel):
     """MLP network with initial 1D convolution layer."""
 
     def __init__(self, hparams, type='encoder'):
+
         super().__init__()
         self.hparams = hparams
+
+        if self.hparams['activation'] == 'linear':
+            self.activation_func = None
+        elif self.hparams['activation'] == 'relu':
+            self.activation_func = nn.ReLU()
+        elif self.hparams['activation'] == 'lrelu':
+            self.activation_func = nn.LeakyReLU(0.05)
+        elif self.hparams['activation'] == 'sigmoid':
+            self.activation_func = nn.Sigmoid()
+        elif self.hparams['activation'] == 'tanh':
+            self.activation_func = nn.Tanh()
+        else:
+            raise ValueError(
+                '"%s" is an invalid activation function' % self.hparams['activation'])
+
         self.model = nn.ModuleList()
         if type == 'encoder':
             self.build_encoder()
@@ -44,20 +60,7 @@ class TemporalMLP(BaseModel):
         if self.hparams['n_hid_layers'] == 0:
             activation = None  # cross entropy loss handles this
         else:
-            if self.hparams['activation'] == 'linear':
-                activation = None
-            elif self.hparams['activation'] == 'relu':
-                activation = nn.ReLU()
-            elif self.hparams['activation'] == 'lrelu':
-                activation = nn.LeakyReLU(0.05)
-            elif self.hparams['activation'] == 'sigmoid':
-                activation = nn.Sigmoid()
-            elif self.hparams['activation'] == 'tanh':
-                activation = nn.Tanh()
-            else:
-                raise ValueError(
-                    '"%s" is an invalid activation function' % self.hparams['activation'])
-
+            activation = self.activation_func
         if activation:
             name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
             self.model.add_module(name, activation)
@@ -81,20 +84,7 @@ class TemporalMLP(BaseModel):
             if i_layer == self.hparams['n_hid_layers'] - 1:
                 activation = None  # cross entropy loss handles this
             else:
-                if self.hparams['activation'] == 'linear':
-                    activation = None
-                elif self.hparams['activation'] == 'relu':
-                    activation = nn.ReLU()
-                elif self.hparams['activation'] == 'lrelu':
-                    activation = nn.LeakyReLU(0.05)
-                elif self.hparams['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
-                elif self.hparams['activation'] == 'tanh':
-                    activation = nn.Tanh()
-                else:
-                    raise ValueError(
-                        '"%s" is an invalid activation function' % self.hparams['activation'])
-
+                activation = self.activation_func
             if activation:
                 name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
                 self.model.add_module(name, activation)
@@ -130,20 +120,7 @@ class TemporalMLP(BaseModel):
                 # no activation for final layer
                 activation = None
             else:
-                if self.hparams['activation'] == 'linear':
-                    activation = None
-                elif self.hparams['activation'] == 'relu':
-                    activation = nn.ReLU()
-                elif self.hparams['activation'] == 'lrelu':
-                    activation = nn.LeakyReLU(0.05)
-                elif self.hparams['activation'] == 'sigmoid':
-                    activation = nn.Sigmoid()
-                elif self.hparams['activation'] == 'tanh':
-                    activation = nn.Tanh()
-                else:
-                    raise ValueError(
-                        '"%s" is an invalid activation function' % self.hparams['activation'])
-
+                activation = self.activation_func
             if activation:
                 name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
                 self.model.add_module(name, activation)

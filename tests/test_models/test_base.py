@@ -1,8 +1,28 @@
 import copy
 import numpy as np
 import pytest
+import torch
 
 from daart.models import Segmenter, Ensembler
+
+
+def test_reparameterize_gaussian():
+
+    from daart.models.base import reparameterize_gaussian
+
+    n = 10
+    m = 4
+
+    mu = 40
+    mus = mu * torch.ones((n, m))
+    logvars = 0.1 * torch.ones((n, m))
+    sample = reparameterize_gaussian(mus, logvars)
+    assert sample.shape == (n, m)
+    assert torch.isclose(torch.mean(sample), torch.tensor([mu], dtype=torch.float), 2)
+
+    logvars2 = 10 * torch.ones((n, m))
+    sample2 = reparameterize_gaussian(mus, logvars2)
+    assert torch.std(sample2) > torch.std(sample)
 
 
 def test_ensembler(hparams, data_generator):
