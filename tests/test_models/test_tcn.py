@@ -15,7 +15,7 @@ def test_tcn(hparams, data_generator):
     model.to(hp['device'])
 
     # load the correct backbone
-    assert isinstance(model.model, DilatedTCN)
+    assert isinstance(model.model['encoder'], DilatedTCN)
 
     # print doesn't fail
     assert model.__str__()

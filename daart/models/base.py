@@ -91,7 +91,15 @@ class Segmenter(BaseModel):
         super().__init__()
         self.hparams = hparams
         self.model_type = hparams['model_type']
-        self.model = None
+
+        # model dict will contain some or all of the following components:
+        # - encoder: inputs -> latents
+        # - classifier: latents -> hand labels
+        # - classifier_weak: latents -> heuristic/pseudo labels
+        # - task_predictor: latents -> tasks
+        # - decoder: latents[t] -> inputs[t]
+        # - predictor: latents[t] -> inputs[t+1]
+        self.model = nn.ModuleDict()
         self.build_model()
 
         # label loss based on cross entropy; don't compute gradient when target = 0
@@ -117,28 +125,42 @@ class Segmenter(BaseModel):
 
     def __str__(self):
         """Pretty print model architecture."""
+
         format_str = '\n%s architecture\n' % self.model_type.upper()
         format_str += '------------------------\n'
 
         format_str += 'Encoder:\n'
-        for i, module in enumerate(self.model.encoder):
+        for i, module in enumerate(self.model['encoder'].model):
             format_str += str('    {}: {}\n'.format(i, module))
-
-        if self.model.predictor is not None:
-            format_str += 'Classifier:\n'
-            for i, module in enumerate(self.model.classifier):
-                format_str += str('    {}: {}\n'.format(i, module))
         format_str += '\n'
 
-        if self.model.predictor is not None:
+        if 'decoder' in self.model:
+            format_str += 'Decoder:\n'
+            for i, module in enumerate(self.model['decoder'].model):
+                format_str += str('    {}: {}\n'.format(i, module))
+            format_str += '\n'
+
+        if 'predictor' in self.model:
             format_str += 'Predictor:\n'
-            for i, module in enumerate(self.model.predictor):
+            for i, module in enumerate(self.model['predictor'].model):
                 format_str += str('    {}: {}\n'.format(i, module))
-        format_str += '\n'
+            format_str += '\n'
 
-        if self.model.task_predictor is not None:
+        if 'classifier' in self.model:
+            format_str += 'Classifier:\n'
+            for i, module in enumerate(self.model['classifier']):
+                format_str += str('    {}: {}\n'.format(i, module))
+            format_str += '\n'
+
+        if 'classifier_weak' in self.model:
+            format_str += 'Classifier Weak:\n'
+            for i, module in enumerate(self.model['classifier_weak']):
+                format_str += str('    {}: {}\n'.format(i, module))
+            format_str += '\n'
+
+        if 'task_predictor' in self.model:
             format_str += 'Task Predictor:\n'
-            for i, module in enumerate(self.model.task_predictor):
+            for i, module in enumerate(self.model['task_predictor']):
                 format_str += str('    {}: {}\n'.format(i, module))
 
         return format_str
@@ -151,25 +173,51 @@ class Segmenter(BaseModel):
         torch.manual_seed(rng_seed_model)
         np.random.seed(rng_seed_model)
 
+        # select backbone network
         if self.hparams['model_type'].lower() == 'temporal-mlp':
-            from daart.models.temporalmlp import TemporalMLP
-            self.model = TemporalMLP(self.hparams)
+            from daart.models.temporalmlp import TemporalMLP as Module
         elif self.hparams['model_type'].lower() == 'tcn':
-            raise NotImplementedError('Split classifiers have not been implemented for TCN')
-            # from daart.models.tcn import TCN
-            # self.model = TCN(self.hparams)
+            raise NotImplementedError('deprecated; use dtcn instead')
         elif self.hparams['model_type'].lower() == 'dtcn':
-            from daart.models.tcn import DilatedTCN
-            self.model = DilatedTCN(self.hparams)
+            from daart.models.tcn import DilatedTCN as Module
         elif self.hparams['model_type'].lower() in ['lstm', 'gru']:
-            from daart.models.rnn import RNN
-            self.model = RNN(self.hparams)
+            from daart.models.rnn import RNN as Module
         elif self.hparams['model_type'].lower() == 'tgm':
             raise NotImplementedError
-            # from daart.models.tgm import TGM
-            # self.model = TGM(self.hparams)
+            # from daart.models.tgm import TGM as Module
         else:
             raise ValueError('"%s" is not a valid model type' % self.hparams['model_type'])
+
+        global_layer_num = 0
+
+        # build encoder module
+        self.model['encoder'] = Module(self.hparams, type='encoder')
+
+        # build decoder module
+        if self.hparams.get('lambda_recon', 0) > 0:
+            self.model['decoder'] = Module(self.hparams, type='decoder')
+
+        # build predictor module
+        if self.hparams.get('lambda_pred', 0) > 0:
+            self.model['predictor'] = Module(self.hparams, type='decoder')
+
+        # classifier: single linear layer for hand labels
+        if self.hparams.get('lambda_strong') > 0:
+            self.model['classifier'] = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
+
+        # classifier: single linear layer for heuristic labels
+        if self.hparams.get('lambda_weak') > 0:
+            self.model['classifier_weak'] = self._build_linear(
+                global_layer_num=global_layer_num, name='classification',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
+
+        # task regression: single linear layer
+        if self.hparams.get('lambda_task') > 0:
+            self.model['task_predictor'] = self._build_linear(
+                global_layer_num=global_layer_num, name='regression',
+                in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
 
     def forward(self, x):
         """Process input data.
@@ -186,6 +234,8 @@ class Segmenter(BaseModel):
                shape of (n_sequences, sequence_length, n_classes)
             - 'labels_weak' (torch.Tensor): model classification of weak/pseudo labels
               shape of (n_sequences, sequence_length, n_classes)
+            - 'reconstruction' (torch.Tensor): input decoder prediction
+              shape of (n_sequences, sequence_length, n_markers)
             - 'prediction' (torch.Tensor): one-step-ahead prediction
               shape of (n_sequences, sequence_length, n_markers)
             - 'task_prediction' (torch.Tensor): prediction of regression tasks
@@ -194,7 +244,48 @@ class Segmenter(BaseModel):
               shape of (n_sequences, sequence_length, embedding_dim)
 
         """
-        return self.model(x)
+        # push data through encoder to get latent embedding
+        # x = B x T x N (e.g. B = 2, T = 500, N = 16)
+        x = self.model['encoder'](x)
+
+        # push embedding through classifiers to get hand labels
+        if self.hparams.get('lambda_strong', 0) > 0:
+            z = self.model['classifier'](x)
+        else:
+            z = None
+
+        # push embedding through linear layer to heuristic/pseudo labels
+        if self.hparams.get('lambda_weak', 0) > 0:
+            z_weak = self.model['classifier_weak'](x)
+        else:
+            z_weak = None
+
+        # push embedding through linear layer to get task predictions
+        if self.hparams.get('lambda_task', 0) > 0:
+            w = self.model['task_predictor'](x)
+        else:
+            w = None
+
+        # push embedding through decoder network to get data at current time point
+        if self.hparams.get('lambda_recon', 0) > 0:
+            yt = self.model['decoder'](x)
+        else:
+            yt = None
+
+        # push embedding through predictor network to get data at subsequent time points
+        if self.hparams.get('lambda_pred', 0) > 0:
+            ytp1 = self.model['predictor'](x)
+        else:
+            ytp1 = None
+
+        return {
+            'labels': z,  # (n_sequences, sequence_length, n_classes)
+            'labels_weak': z_weak,  # (n_sequences, sequence_length, n_classes)
+            'reconstruction': yt,  # (n_sequences, sequence_length, n_markers)
+            'prediction': ytp1,  # (n_sequences, sequence_length, n_markers)
+            'task_prediction': w,  # (n_sequences, sequence_length, n_tasks)
+            'embedding': x,  # (n_sequences, sequence_length, embedding_dim)
+        }
 
     def predict_labels(self, data_generator, return_scores=False, remove_pad=True):
         """
@@ -246,7 +337,7 @@ class Segmenter(BaseModel):
             data_generator.reset_iterators(dtype)
             for i in range(data_generator.n_tot_batches[dtype]):
                 data, sess_list = data_generator.next_batch(dtype)
-                outputs_dict = self.model(data['markers'])
+                outputs_dict = self.forward(data['markers'])
                 # remove padding if necessary
                 if pad > 0 and remove_pad:
                     for key, val in outputs_dict.items():
@@ -270,7 +361,7 @@ class Segmenter(BaseModel):
             'labels': labels,
             'scores': scores,
             'embedding': embedding,
-            'task_predictions': task_predictions
+            'task_predictions': task_predictions,
         }
 
     def training_step(self, data, accumulate_grad=True, **kwargs):
@@ -306,7 +397,7 @@ class Segmenter(BaseModel):
 
         # push data through model
         markers_wpad = data['markers']
-        outputs_dict = self.model(markers_wpad)
+        outputs_dict = self.forward(markers_wpad)
 
         # remove padding from supplied data
         if lambda_strong > 0:

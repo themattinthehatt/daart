@@ -25,6 +25,9 @@ lambda_weak: 1
 # hyperparam on classifying strong labels
 lambda_strong: 1
 
+# hyperparam on reconstructing input
+lambda_recon: 0
+
 # hyperparam on next-step-ahead prediciton
 lambda_pred: 1
 

@@ -15,8 +15,8 @@ def test_lstm(hparams, data_generator):
     model.to(hp['device'])
 
     # load the correct backbone
-    assert isinstance(model.model, RNN)
-    for name, layer in model.model.encoder.named_children():
+    assert isinstance(model.model['encoder'], RNN)
+    for name, layer in model.model['encoder'].model.named_children():
         assert isinstance(layer, torch.nn.LSTM)
         break
 
@@ -69,8 +69,8 @@ def test_gru(hparams, data_generator):
     model.to(hp['device'])
 
     # load the correct backbone
-    assert isinstance(model.model, RNN)
-    for name, layer in model.model.encoder.named_children():
+    assert isinstance(model.model['encoder'], RNN)
+    for name, layer in model.model['encoder'].model.named_children():
         assert isinstance(layer, torch.nn.GRU)
         break
 
