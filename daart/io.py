@@ -95,7 +95,7 @@ def get_model_dir(base_dir: str, model_params: dict) -> str:
     base_dir : str
         base results directory
     model_params : dict
-        should contain the keys `model_type` and optionally `experiment_name`
+        should contain the keys `backbone` and optionally `experiment_name`
 
     Returns
     -------
@@ -103,7 +103,7 @@ def get_model_dir(base_dir: str, model_params: dict) -> str:
         absolute path of model directory
 
     """
-    model_dir = model_params['model_type']
+    model_dir = model_params['backbone']
     return os.path.join(base_dir, model_dir, model_params.get('experiment_name', ''))
 
 
@@ -123,7 +123,7 @@ def get_model_params(hparams: dict) -> dict:
 
     """
 
-    model_type = hparams['model_type']
+    backbone = hparams['backbone']
 
     # start with general params
     hparams_less = {
@@ -131,7 +131,7 @@ def get_model_params(hparams: dict) -> dict:
         'rng_seed_model': hparams['rng_seed_model'],
         'trial_splits': hparams['trial_splits'],
         'train_frac': hparams['train_frac'],
-        'model_type': hparams['model_type'],
+        'backbone': hparams['backbone'],
         'sequence_length': hparams['sequence_length'],
         'batch_size': hparams['batch_size'],
         'lambda_weak': hparams['lambda_weak'],
@@ -139,11 +139,12 @@ def get_model_params(hparams: dict) -> dict:
         'lambda_pred': hparams['lambda_pred'],
         'lambda_task': hparams.get('lambda_task', 0),
         'input_type': hparams['input_type'],
-        'semi_supervised_algo': hparams.get('semi_supervised_algo', None)
+        'semi_supervised_algo': hparams.get('semi_supervised_algo', None),
+        'variational': hparams.get('variational', False),
     }
 
-    # get model-specific params
-    if model_type == 'temporal-mlp':
+    # get backbone-specific params
+    if backbone == 'temporal-mlp':
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
         if hparams['n_hid_layers'] != 0:
@@ -151,7 +152,7 @@ def get_model_params(hparams: dict) -> dict:
         hparams_less['n_lags'] = hparams['n_lags']
         hparams_less['activation'] = hparams['activation']
         hparams_less['l2_reg'] = hparams['l2_reg']
-    elif model_type in ['lstm', 'gru']:
+    elif backbone in ['lstm', 'gru']:
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
         if hparams['n_hid_layers'] != 0:
@@ -159,7 +160,7 @@ def get_model_params(hparams: dict) -> dict:
         hparams_less['activation'] = hparams['activation']
         hparams_less['l2_reg'] = hparams['l2_reg']
         hparams_less['bidirectional'] = hparams['bidirectional']
-    elif model_type in ['tcn', 'dtcn']:
+    elif backbone in ['tcn', 'dtcn']:
         hparams_less['learning_rate'] = hparams['learning_rate']
         hparams_less['n_hid_layers'] = hparams['n_hid_layers']
         if hparams['n_hid_layers'] != 0:
@@ -167,14 +168,14 @@ def get_model_params(hparams: dict) -> dict:
         hparams_less['n_lags'] = hparams['n_lags']
         hparams_less['activation'] = hparams['activation']
         hparams_less['l2_reg'] = hparams['l2_reg']
-        if model_type == 'dtcn':
+        if backbone == 'dtcn':
             hparams_less['dropout'] = hparams['dropout']
-    elif model_type == 'random-forest':
+    elif backbone == 'random-forest':
         hparams_less.pop('lambda_weak')
         hparams_less.pop('lambda_strong')
         hparams_less.pop('lambda_pred')
     else:
-        raise NotImplementedError('"%s" is not a valid model type' % model_type)
+        raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
 
     # get other params
     if hparams_less['semi_supervised_algo'] == 'pseudo_labels':

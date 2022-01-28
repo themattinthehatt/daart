@@ -31,13 +31,13 @@ TEMP_DATA = {
 SESSIONS = ['sess-0', 'sess-1']
 
 MODELS_TO_FIT = [
-    {'model_type': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
-    # {'model_type': 'temporal-mlp', 'sessions': SESSIONS},
-    {'model_type': 'lstm', 'sessions': [SESSIONS[0]]},
-    {'model_type': 'gru', 'sessions': [SESSIONS[0]]},
-    # {'model_type': 'tcn', 'sessions': [SESSIONS[0]]},
-    {'model_type': 'dtcn', 'sessions': [SESSIONS[0]]},
-    {'model_type': 'dtcn', 'sessions': SESSIONS},
+    {'backbone': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'temporal-mlp', 'sessions': SESSIONS},
+    {'backbone': 'lstm', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'gru', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'tcn', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'dtcn', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'dtcn', 'sessions': SESSIONS},
 ]
 
 """
@@ -126,7 +126,7 @@ def make_tasks(save_file, n_time, n_tasks):
     df.to_csv(save_file)
 
 
-def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
+def define_new_config_values(backbone, sessions=['sess-0'], base_dir=None):
 
     # data vals
     data_dict = {
@@ -158,35 +158,35 @@ def define_new_config_values(model, sessions=['sess-0'], base_dir=None):
     lambda_strong = 1
     lambda_pred = 1
 
-    if model == 'temporal-mlp':
+    if backbone == 'temporal-mlp':
         new_values = {
             'data': data_dict,
             'model': {
                 'tt_experiment_name': expt_name,
-                'model_type': model,
+                'backbone': backbone,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred},
             'train': train_dict}
-    elif model in ['lstm', 'gru']:
+    elif backbone in ['lstm', 'gru']:
         new_values = {
             'data': data_dict,
             'model': {
                 'tt_experiment_name': expt_name,
-                'model_type': model,
+                'backbone': backbone,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
                 'bidirectional': True},
             'train': train_dict}
-    elif model in ['tcn', 'dtcn']:
+    elif backbone in ['tcn', 'dtcn']:
         new_values = {
             'data': data_dict,
             'model': {
                 'tt_experiment_name': expt_name,
-                'model_type': model,
+                'backbone': backbone,
                 'n_hid_layers': 2,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
@@ -317,22 +317,22 @@ def main(args):
             'model': os.path.join(config_dir, 'model.yaml'),
             'train': os.path.join(config_dir, 'train.yaml')}
         new_values = define_new_config_values(
-            model['model_type'], model['sessions'], base_dir)
+            model['backbone'], model['sessions'], base_dir)
         config_dicts, new_config_files = update_config_files(
             base_config_files, new_values, base_dir)
 
         # fit model
         print('\n\n---------------------------------------------------')
-        print('model: %s' % model['model_type'])
+        print('model: %s' % model['backbone'])
         print('session: %s' % model['sessions'])
         print('---------------------------------------------------\n\n')
         fit_model(fit_file, new_config_files)
 
         # check model
         if len(model['sessions']) > 1:
-            model_key = '%s-multisession' % model['model_type']
+            model_key = '%s-multisession' % model['backbone']
         else:
-            model_key = model['model_type']
+            model_key = model['backbone']
         print_strs[model_key] = check_model(config_dicts)
 
     # remove temp dirs

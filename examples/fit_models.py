@@ -10,7 +10,6 @@ import torch
 
 from daart.eval import plot_training_curves
 from daart.io import export_hparams
-from daart.models import Segmenter
 from daart.testtube import get_all_params, print_hparams, create_tt_experiment, clean_tt_dir
 from daart.train import Trainer
 from daart.utils import build_data_generator
@@ -64,7 +63,11 @@ def train_model(hparams):
     # build model
     # -------------------------------------
     torch.manual_seed(hparams.get('rng_seed_model', 0))
-    model = Segmenter(hparams)
+    if hparams['model_class'].lower() == 'segmenter':
+        from daart.models import Segmenter
+        model = Segmenter(hparams)
+    else:
+        raise NotImplementedError
     model.to(hparams['device'])
     logging.info(model)
 

@@ -13,7 +13,7 @@ class RNN(BaseModel):
     def __init__(self, hparams, type='encoder'):
         super().__init__()
         self.hparams = hparams
-        self.model_type = hparams.get('model_type', 'lstm').lower()
+        self.backbone = hparams.get('backbone', 'lstm').lower()
         self.model = nn.ModuleList()
         if type == 'encoder':
             self.build_encoder()
@@ -23,7 +23,7 @@ class RNN(BaseModel):
     def _build_rnn(self, in_size, out_size, global_layer_num=0):
 
         # RNN layers
-        if self.model_type == 'lstm':
+        if self.backbone == 'lstm':
             layer = nn.LSTM(
                 input_size=in_size,
                 hidden_size=self.hparams['n_hid_units'],
@@ -31,7 +31,7 @@ class RNN(BaseModel):
                 batch_first=True,
                 bidirectional=self.hparams['bidirectional'])
             name = str('LSTM_layer_%02i' % global_layer_num)
-        elif self.hparams['model_type'] == 'gru':
+        elif self.backbone == 'gru':
             layer = nn.GRU(
                 input_size=in_size,
                 hidden_size=self.hparams['n_hid_units'],
@@ -41,7 +41,7 @@ class RNN(BaseModel):
             name = str('GRU_layer_%02i' % global_layer_num)
         else:
             raise NotImplementedError(
-                'Invalid model type "%s"; must choose "lstm" or "gru"' % self.model_type)
+                'Invalid backbone "%s"; must choose "lstm" or "gru"' % self.model_type)
         self.model.add_module(name, layer)
 
         # update layer info

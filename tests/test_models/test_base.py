@@ -8,7 +8,7 @@ from daart.models import Segmenter, Ensembler
 def test_ensembler(hparams, data_generator):
 
     hp = copy.deepcopy(hparams)
-    hp['model_type'] = 'dtcn'
+    hp['backbone'] = 'dtcn'
 
     n_models = 3
 

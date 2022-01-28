@@ -70,7 +70,7 @@ class Segmenter(BaseModel):
         Parameters
         ----------
         hparams : dict
-            - model_type (str): 'temporal-mlp' | 'dtcn' | 'lstm' | 'gru' | 'tgm'
+            - backbone (str): 'temporal-mlp' | 'dtcn' | 'lstm' | 'gru'
             - rng_seed_model (int): random seed to control weight initialization
             - input_size (int): number of input channels
             - output_size (int): number of classes
@@ -82,6 +82,7 @@ class Segmenter(BaseModel):
             - activation (str): 'linear' | 'relu' | 'lrelu' | 'sigmoid' | 'tanh'
             - classifier_type (str): 'multiclass' | 'binary' | 'multibinary'
             - class_weights (array-like): weights on classes
+            - variational (bool): whether or not model is variational
             - lambda_weak (float): hyperparam on weak label classification
             - lambda_strong (float): hyperparam on srong label classification
             - lambda_pred (float): hyperparam on next step prediction
@@ -90,7 +91,6 @@ class Segmenter(BaseModel):
         """
         super().__init__()
         self.hparams = hparams
-        self.model_type = hparams['model_type']
 
         # model dict will contain some or all of the following components:
         # - encoder: inputs -> latents
@@ -126,7 +126,7 @@ class Segmenter(BaseModel):
     def __str__(self):
         """Pretty print model architecture."""
 
-        format_str = '\n%s architecture\n' % self.model_type.upper()
+        format_str = '\n%s architecture\n' % self.hparams['backbone'].upper()
         format_str += '------------------------\n'
 
         format_str += 'Encoder:\n'
@@ -174,19 +174,19 @@ class Segmenter(BaseModel):
         np.random.seed(rng_seed_model)
 
         # select backbone network
-        if self.hparams['model_type'].lower() == 'temporal-mlp':
+        if self.hparams['backbone'].lower() == 'temporal-mlp':
             from daart.models.temporalmlp import TemporalMLP as Module
-        elif self.hparams['model_type'].lower() == 'tcn':
+        elif self.hparams['backbone'].lower() == 'tcn':
             raise NotImplementedError('deprecated; use dtcn instead')
-        elif self.hparams['model_type'].lower() == 'dtcn':
+        elif self.hparams['backbone'].lower() == 'dtcn':
             from daart.models.tcn import DilatedTCN as Module
-        elif self.hparams['model_type'].lower() in ['lstm', 'gru']:
+        elif self.hparams['backbone'].lower() in ['lstm', 'gru']:
             from daart.models.rnn import RNN as Module
-        elif self.hparams['model_type'].lower() == 'tgm':
+        elif self.hparams['backbone'].lower() == 'tgm':
             raise NotImplementedError
             # from daart.models.tgm import TGM as Module
         else:
-            raise ValueError('"%s" is not a valid model type' % self.hparams['model_type'])
+            raise ValueError('"%s" is not a valid backbone network' % self.hparams['backbone'])
 
         global_layer_num = 0
 

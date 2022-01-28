@@ -175,23 +175,23 @@ def compute_sequence_pad(hparams: dict) -> int:
 
     """
 
-    if hparams['model_type'].lower() == 'temporal-mlp':
+    if hparams['backbone'].lower() == 'temporal-mlp':
         pad = hparams['n_lags']
-    elif hparams['model_type'].lower() == 'tcn':
+    elif hparams['backbone'].lower() == 'tcn':
         pad = (2 ** hparams['n_hid_layers']) * hparams['n_lags']
-    elif hparams['model_type'].lower() == 'dtcn':
+    elif hparams['backbone'].lower() == 'dtcn':
         # dilattion of each dilation block is 2 ** layer_num
         # 2 conv layers per dilation block
         pad = sum([2 * (2 ** n) * hparams['n_lags'] for n in range(hparams['n_hid_layers'])])
-    elif hparams['model_type'].lower() in ['lstm', 'gru']:
+    elif hparams['backbone'].lower() in ['lstm', 'gru']:
         # give some warmup timesteps
         pad = 4
-    elif hparams['model_type'].lower() == 'tgm':
+    elif hparams['backbone'].lower() == 'tgm':
         raise NotImplementedError
-    elif hparam['model_type'].lower() == 'random-forest':
+    elif hparam['backbone'].lower() == 'random-forest':
         pad = 0
     else:
-        raise ValueError('"%s" is not a valid model type' % hparams['model_type'])
+        raise ValueError('"%s" is not a valid backbone network' % hparams['backbone'])
 
     return pad
 

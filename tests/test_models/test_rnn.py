@@ -9,7 +9,7 @@ from daart.models.rnn import RNN
 def test_lstm(hparams, data_generator):
 
     hp = copy.deepcopy(hparams)
-    hp['model_type'] = 'lstm'
+    hp['backbone'] = 'lstm'
 
     model = Segmenter(hp)
     model.to(hp['device'])
@@ -63,7 +63,7 @@ def test_lstm(hparams, data_generator):
 def test_gru(hparams, data_generator):
 
     hp = copy.deepcopy(hparams)
-    hp['model_type'] = 'gru'
+    hp['backbone'] = 'gru'
 
     model = Segmenter(hp)
     model.to(hp['device'])

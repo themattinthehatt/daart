@@ -9,7 +9,7 @@ from daart.models.tcn import DilatedTCN
 def test_tcn(hparams, data_generator):
 
     hp = copy.deepcopy(hparams)
-    hp['model_type'] = 'dtcn'
+    hp['backbone'] = 'dtcn'
 
     model = Segmenter(hp)
     model.to(hp['device'])

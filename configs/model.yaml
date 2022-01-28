@@ -1,5 +1,10 @@
-# currently supported: temporal-mlp, lstm, gru, tcn, dtcn
-model_type: dtcn
+# general model class
+# segmenter | [todo: gmdgm]
+model_class: segmenter
+
+# backbone network architecture for encoders/decoders
+# temporal-mlp | lstm | gru | dtcn
+backbone: dtcn
 
 # hidden layers for both classifier and predictor networks
 n_hid_layers: 2
@@ -19,6 +24,9 @@ bidirectional: true
 # dropout for individual channels of dilated TCN models (soon to be for others)
 dropout: 0.1
 
+# classifier type: binary | multiclass
+classifier_type: multiclass
+
 # hyperparam on classifying heuristic labels OR pseudo labels
 lambda_weak: 1
 
@@ -34,14 +42,14 @@ lambda_pred: 1
 # hyperparam on task programming regression loss
 lambda_task: 0
 
-# classifier type: binary | multiclass
-classifier_type: multiclass
-
 # name of experiment for test-tube organizing
 tt_experiment_name: test
 
 # control initialization of model
 rng_seed_model: 0
+
+# true to fit a variational version of the model where latent embeddings are sampled from gaussian
+variational: true
 
 
 # SEMI-SUPERVISION PARAMS
