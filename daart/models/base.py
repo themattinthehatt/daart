@@ -157,6 +157,13 @@ class Segmenter(BaseModel):
             format_str += str('    {}: {}\n'.format(i, module))
         format_str += '\n'
 
+        if self.hparams.get('variational', False):
+            format_str += 'Variational Layers:\n'
+            for l in ['latent_mean', 'latent_logvar']:
+                for i, module in enumerate(self.model[l]):
+                    format_str += str('    {}: {}\n'.format(i, module))
+            format_str += '\n'
+
         if 'decoder' in self.model:
             format_str += 'Decoder:\n'
             for i, module in enumerate(self.model['decoder'].model):

@@ -31,13 +31,12 @@ TEMP_DATA = {
 SESSIONS = ['sess-0', 'sess-1']
 
 MODELS_TO_FIT = [
-    {'backbone': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'temporal-mlp', 'sessions': SESSIONS},
-    {'backbone': 'lstm', 'sessions': [SESSIONS[0]]},
-    {'backbone': 'gru', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'tcn', 'sessions': [SESSIONS[0]]},
-    {'backbone': 'dtcn', 'sessions': [SESSIONS[0]]},
-    {'backbone': 'dtcn', 'sessions': SESSIONS},
+    # {'backbone': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'lstm', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'gru', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'dtcn', 'sessions': [SESSIONS[0]]},
+    # {'backbone': 'dtcn', 'sessions': SESSIONS},
+    {'backbone': 'variational-dtcn', 'sessions': [SESSIONS[0]]},
 ]
 
 """
@@ -157,6 +156,7 @@ def define_new_config_values(backbone, sessions=['sess-0'], base_dir=None):
     lambda_weak = 1
     lambda_strong = 1
     lambda_pred = 1
+    lambda_task = 1
 
     if backbone == 'temporal-mlp':
         new_values = {
@@ -164,10 +164,13 @@ def define_new_config_values(backbone, sessions=['sess-0'], base_dir=None):
             'model': {
                 'tt_experiment_name': expt_name,
                 'backbone': backbone,
+                'variational': False,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
-                'lambda_pred': lambda_pred},
+                'lambda_pred': lambda_pred,
+                'lambda_task': lambda_task,
+            },
             'train': train_dict}
     elif backbone in ['lstm', 'gru']:
         new_values = {
@@ -175,11 +178,14 @@ def define_new_config_values(backbone, sessions=['sess-0'], base_dir=None):
             'model': {
                 'tt_experiment_name': expt_name,
                 'backbone': backbone,
+                'variational': False,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
-                'bidirectional': True},
+                'lambda_task': lambda_task,
+                'bidirectional': True,
+            },
             'train': train_dict}
     elif backbone in ['tcn', 'dtcn']:
         new_values = {
@@ -187,12 +193,31 @@ def define_new_config_values(backbone, sessions=['sess-0'], base_dir=None):
             'model': {
                 'tt_experiment_name': expt_name,
                 'backbone': backbone,
+                'variational': False,
                 'n_hid_layers': 2,
                 'n_lags': 1,
                 'lambda_weak': lambda_weak,
                 'lambda_strong': lambda_strong,
                 'lambda_pred': lambda_pred,
-                'dropout': 0.1},
+                'lambda_task': lambda_task,
+                'dropout': 0.1,
+            },
+            'train': train_dict}
+    elif backbone == 'variational-dtcn':
+        new_values = {
+            'data': data_dict,
+            'model': {
+                'tt_experiment_name': expt_name,
+                'backbone': 'dtcn',
+                'variational': True,
+                'n_hid_layers': 2,
+                'n_lags': 1,
+                'lambda_weak': lambda_weak,
+                'lambda_strong': lambda_strong,
+                'lambda_pred': lambda_pred,
+                'lambda_task': lambda_task,
+                'dropout': 0.1,
+            },
             'train': train_dict}
     else:
         raise NotImplementedError
