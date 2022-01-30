@@ -20,7 +20,7 @@ def hparams() -> dict:
     """Load all example config files without test-tube."""
 
     base_dir = os.path.dirname(os.path.dirname(os.path.join(__file__)))
-    config_dir = os.path.join(base_dir, 'configs')
+    config_dir = os.path.join(base_dir, 'data', 'configs')
 
     keys = ['data', 'model', 'train']
     hparams = {}

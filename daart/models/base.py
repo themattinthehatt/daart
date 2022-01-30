@@ -239,19 +239,19 @@ class Segmenter(BaseModel):
             self.model['predictor'] = Module(self.hparams, type='decoder')
 
         # classifier: single linear layer for hand labels
-        if self.hparams.get('lambda_strong') > 0:
+        if self.hparams.get('lambda_strong', 0) > 0:
             self.model['classifier'] = self._build_linear(
                 global_layer_num=global_layer_num, name='classification',
                 in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
 
         # classifier: single linear layer for heuristic labels
-        if self.hparams.get('lambda_weak') > 0:
+        if self.hparams.get('lambda_weak', 0) > 0:
             self.model['classifier_weak'] = self._build_linear(
                 global_layer_num=global_layer_num, name='classification',
                 in_size=self.hparams['n_hid_units'], out_size=self.hparams['output_size'])
 
         # task regression: single linear layer
-        if self.hparams.get('lambda_task') > 0:
+        if self.hparams.get('lambda_task', 0) > 0:
             self.model['task_predictor'] = self._build_linear(
                 global_layer_num=global_layer_num, name='regression',
                 in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])

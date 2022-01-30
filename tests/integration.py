@@ -31,12 +31,12 @@ TEMP_DATA = {
 SESSIONS = ['sess-0', 'sess-1']
 
 MODELS_TO_FIT = [
-    # {'backbone': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'lstm', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'gru', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'dtcn', 'sessions': [SESSIONS[0]]},
-    # {'backbone': 'dtcn', 'sessions': SESSIONS},
-    {'backbone': 'variational-dtcn', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'temporal-mlp', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'lstm', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'gru', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'dtcn', 'sessions': [SESSIONS[0]]},
+    {'backbone': 'dtcn', 'sessions': SESSIONS},  # multiple sessions
+    {'backbone': 'variational-dtcn', 'sessions': [SESSIONS[0]]},  # variational model
 ]
 
 """
@@ -325,7 +325,7 @@ def main(args):
     make_tmp_data(base_dir)
     print('done')
 
-    config_dir = os.path.join(os.getcwd(), 'configs')
+    config_dir = os.path.join(os.getcwd(), 'data', 'configs')
     fit_file = os.path.join(os.getcwd(), 'examples', 'fit_models.py')
 
     # store results of tests
