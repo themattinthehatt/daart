@@ -91,6 +91,10 @@ def train_model(hparams):
                 epoch_end=hparams['anneal_end']))
             callbacks.append(PseudoLabels(
                 prob_threshold=hparams['prob_threshold'], epoch_start=hparams['anneal_start']))
+    if hparams.get('variational', False):
+        from daart.callbacks import AnnealHparam
+        callbacks.append(AnnealHparam(
+            hparams=model.hparams, key='kl_weight', epoch_start=0, epoch_end=100))
 
     # -------------------------------------
     # train model + cleanup

@@ -223,6 +223,7 @@ class Segmenter(BaseModel):
         # build encoder module
         self.model['encoder'] = Module(self.hparams, type='encoder')
         if self.hparams.get('variational', False):
+            self.hparams['kl_weight'] = 1  # weight in front of kl term; anneal this using callback
             self.model['latent_mean'] = self._build_linear(
                 global_layer_num=len(self.model['encoder'].model), name='latent_mean',
                 in_size=self.hparams['n_hid_units'], out_size=self.hparams['n_hid_units'])
@@ -446,6 +447,7 @@ class Segmenter(BaseModel):
         lambda_strong = self.hparams.get('lambda_strong', 0)
         lambda_pred = self.hparams.get('lambda_pred', 0)
         lambda_task = self.hparams.get('lambda_task', 0)
+        kl_weight = self.hparams.get('kl_weight', 1)
 
         # index padding for convolutions
         pad = self.hparams.get('sequence_pad', 0)
@@ -567,8 +569,9 @@ class Segmenter(BaseModel):
             # and prediction rather than (1 / 2\sigma^2) * MSE
             loss_kl = 2.0 * losses.kl_div_to_std_normal(
                 outputs_dict['latent_mean'], outputs_dict['latent_logvar'])
-            loss += loss_kl
+            loss += kl_weight * loss_kl
             # log
+            loss_dict['kl_weight'] = kl_weight
             loss_dict['loss_kl'] = loss_kl.item()
 
         if accumulate_grad:

@@ -178,7 +178,9 @@ def plot_training_curves(
 
     """
 
-    metrics_list = ['loss', 'loss_weak', 'loss_strong', 'loss_pred', 'loss_task', 'fc']
+    metrics_list = [
+        'loss', 'loss_weak', 'loss_strong', 'loss_pred', 'loss_task', 'loss_kl', 'fc'
+    ]
 
     metrics_dfs = [load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids)]
     metrics_df = pd.concat(metrics_dfs, sort=False)
