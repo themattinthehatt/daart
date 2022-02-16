@@ -238,8 +238,8 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
                 version_file = os.path.join(tt_expt_dir, version, 'hparams.yaml')
                 with open(version_file, 'r') as f:
                     hparams_ = yaml.safe_load(f)
-
-            if all([hparams_[key] == hparams_less[key] for key in hparams_less.keys()]):
+            # change to just match on lambdas - not sure how we want to do this longterm
+            if all([hparams_[key] == hparams_less[key] for key in ['lambda_weak', 'lambda_pred']]):#hparams_less.keys()]):
                 # found match - did it finish training?
                 if hparams_['training_completed']:
                     found_match = True
