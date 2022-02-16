@@ -411,7 +411,7 @@ class Segmenter(BaseModel):
                             outputs_dict['labels'][s].cpu().detach().numpy()
                     if outputs_dict.get('task_prediction', None) is not None:
                         task_predictions[sess][batch_idx] = \
-                            outputs_dict['labels'][s].cpu().detach().numpy()
+                            outputs_dict['task_prediction'][s].cpu().detach().numpy()
 
         return {
             'labels': labels,
