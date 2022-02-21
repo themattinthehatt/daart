@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
-from daart.models.base import BaseModel
+from daart.models.base import BaseModel, get_activation_func_from_str
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['DilatedTCN']
@@ -157,34 +157,12 @@ class DilationBlock(nn.Module):
             padding=kernel_size * dilation))  # same output
 
         # intermediate activations
-        if activation == 'linear':
-            self.activation = nn.Identity()
-        elif activation == 'relu':
-            self.activation = nn.ReLU()
-        elif activation == 'lrelu':
-            self.activation = nn.LeakyReLU(0.05)
-        elif activation == 'sigmoid':
-            self.activation = nn.Sigmoid()
-        elif activation == 'tanh':
-            self.activation = nn.Tanh()
-        else:
-            raise ValueError('"%s" is an invalid activation function' % activation)
+        self.activation = get_activation_func_from_str(activation)
 
         # final activation
         if final_activation is None:
             final_activation = activation
-        if final_activation == 'linear':
-            self.final_activation = nn.Identity()
-        elif final_activation == 'relu':
-            self.final_activation = nn.ReLU()
-        elif final_activation == 'lrelu':
-            self.final_activation = nn.LeakyReLU(0.05)
-        elif final_activation == 'sigmoid':
-            self.final_activation = nn.Sigmoid()
-        elif final_activation == 'tanh':
-            self.final_activation = nn.Tanh()
-        else:
-            raise ValueError('"%s" is an invalid activation function' % final_activation)
+        self.final_activation = get_activation_func_from_str(final_activation)
 
         # no Dropout1D in pytorch API, but Dropout2D does what what we want:
         # takes an input of shape (N, C, L) and drops out entire features in the `C` dimension

@@ -4,7 +4,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
 from torch import nn
-from daart.models.base import BaseModel
+from daart.models.base import BaseModel, get_activation_func_from_str
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['TemporalMLP']
@@ -18,19 +18,7 @@ class TemporalMLP(BaseModel):
         super().__init__()
         self.hparams = hparams
 
-        if self.hparams['activation'] == 'linear':
-            self.activation_func = None
-        elif self.hparams['activation'] == 'relu':
-            self.activation_func = nn.ReLU()
-        elif self.hparams['activation'] == 'lrelu':
-            self.activation_func = nn.LeakyReLU(0.05)
-        elif self.hparams['activation'] == 'sigmoid':
-            self.activation_func = nn.Sigmoid()
-        elif self.hparams['activation'] == 'tanh':
-            self.activation_func = nn.Tanh()
-        else:
-            raise ValueError(
-                '"%s" is an invalid activation function' % self.hparams['activation'])
+        self.activation_func = get_activation_func_from_str(self.hparams['activation'])
 
         self.model = nn.ModuleList()
         if type == 'encoder':

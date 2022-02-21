@@ -13,7 +13,10 @@ from torch import nn, save
 from daart import losses
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['reparameterize_gaussian', 'BaseModel', 'Segmenter', 'Ensembler']
+__all__ = [
+    'reparameterize_gaussian', 'get_activation_func_from_str', 'BaseModel', 'Segmenter',
+    'Ensembler'
+]
 
 
 def reparameterize_gaussian(mu, logvar):
@@ -35,6 +38,24 @@ def reparameterize_gaussian(mu, logvar):
     std = torch.exp(logvar)
     eps = torch.randn_like(std)
     return eps.mul(std).add_(mu)
+
+
+def get_activation_func_from_str(activation_str):
+
+    if activation_str == 'linear':
+        activation_func = None
+    elif activation_str == 'relu':
+        activation_func = nn.ReLU()
+    elif activation_str == 'lrelu':
+        activation_func = nn.LeakyReLU(0.05)
+    elif activation_str == 'sigmoid':
+        activation_func = nn.Sigmoid()
+    elif activation_str == 'tanh':
+        activation_func = nn.Tanh()
+    else:
+        raise ValueError('"%s" is an invalid activation function' % activation_str)
+
+    return activation_func
 
 
 class BaseModel(nn.Module):
@@ -62,6 +83,44 @@ class BaseModel(nn.Module):
         linear_layer.add_module(layer_name, layer)
 
         return linear_layer
+
+    @staticmethod
+    def _build_mlp(
+            self, global_layer_num, in_size, hid_size, out_size, n_hid_layers=1,
+            activation='lrelu'):
+
+        mlp = nn.Sequential()
+
+        in_size_ = in_size
+
+        # loop over hidden layers (0 layers <-> linear model)
+        for i_layer in range(n_hid_layers + 1):
+
+            if i_layer == n_hid_layers:
+                out_size_ = out_size
+            else:
+                out_size_ = hid_size
+
+            # add layer
+            layer = nn.Linear(in_features=in_size_, out_features=out_size_)
+            name = str('dense_layer_%02i' % global_layer_num)
+            mlp.add_module(name, layer)
+
+            # add activation
+            if i_layer == n_hid_layers:
+                # no activation for final layer
+                activation_func = None
+            else:
+                activation_func = get_activation_func_from_str(activation)
+            if activation_func:
+                name = '%s_%02i' % (activation, global_layer_num)
+                mlp.add_module(name, activation_func)
+
+            # update layer info
+            global_layer_num += 1
+            in_size_ = out_size_
+
+        return mlp
 
     def forward(self, *args, **kwargs):
         """Push data through model."""
