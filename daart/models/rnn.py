@@ -10,23 +10,31 @@ __all__ = ['RNN']
 
 class RNN(BaseModel):
 
-    def __init__(self, hparams, type='encoder'):
+    def __init__(self, hparams, type='encoder', in_size=None, hid_size=None, out_size=None):
         super().__init__()
         self.hparams = hparams
         self.backbone = hparams.get('backbone', 'lstm').lower()
         self.model = nn.ModuleList()
         if type == 'encoder':
-            self.build_encoder()
+            in_size_ = hparams['input_size'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['n_hid_units'] if out_size is None else out_size
+            self._build_rnn(
+                in_size=in_size_, hid_size=hid_size_, out_size=out_size_, global_layer_num=0)
         else:
-            self.build_decoder()
+            in_size_ = hparams['n_hid_units'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['input_size'] if out_size is None else out_size
+            self._build_rnn(
+                in_size=in_size_, hid_size=hid_size_, out_size=out_size_, global_layer_num=0)
 
-    def _build_rnn(self, in_size, out_size, global_layer_num=0):
+    def _build_rnn(self, in_size, hid_size, out_size, global_layer_num=0):
 
         # RNN layers
         if self.backbone == 'lstm':
             layer = nn.LSTM(
                 input_size=in_size,
-                hidden_size=self.hparams['n_hid_units'],
+                hidden_size=hid_size,
                 num_layers=self.hparams['n_hid_layers'],
                 batch_first=True,
                 bidirectional=self.hparams['bidirectional'])
@@ -34,7 +42,7 @@ class RNN(BaseModel):
         elif self.backbone == 'gru':
             layer = nn.GRU(
                 input_size=in_size,
-                hidden_size=self.hparams['n_hid_units'],
+                hidden_size=hid_size,
                 num_layers=self.hparams['n_hid_layers'],
                 batch_first=True,
                 bidirectional=self.hparams['bidirectional'])
@@ -48,7 +56,7 @@ class RNN(BaseModel):
         global_layer_num += 1
 
         # final linear layer
-        final_encoder_size = (int(self.hparams['bidirectional']) + 1) * self.hparams['n_hid_units']
+        final_encoder_size = (int(self.hparams['bidirectional']) + 1) * hid_size
         layer = nn.Linear(in_features=final_encoder_size, out_features=out_size)
         name = str('dense(prediction)_layer_%02i' % global_layer_num)
         self.model.add_module(name, layer)
@@ -56,22 +64,6 @@ class RNN(BaseModel):
         # update layer info
         global_layer_num += 1
 
-        return global_layer_num
-
-    def build_encoder(self):
-        """Construct the encoder using hparams."""
-        global_layer_num = self._build_rnn(
-            in_size=self.hparams['input_size'], out_size=self.hparams['n_hid_units'],
-            global_layer_num=0,
-        )
-        return global_layer_num
-
-    def build_decoder(self):
-        """Construct the decoder using hparams."""
-        global_layer_num = self._build_rnn(
-            in_size=self.hparams['n_hid_units'], out_size=self.hparams['input_size'],
-            global_layer_num=0,
-        )
         return global_layer_num
 
     def forward(self, x, **kwargs):

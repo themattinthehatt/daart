@@ -16,17 +16,22 @@ class DilatedTCN(BaseModel):
     Code adapted from: https://www.kaggle.com/ceshine/pytorch-temporal-convolutional-networks
     """
 
-    def __init__(self, hparams, type='encoder'):
+    def __init__(self, hparams, type='encoder', in_size=None, hid_size=None, out_size=None):
         super().__init__()
         self.hparams = hparams
-        self.hparams['pred_final_linear_layer'] = self.hparams.get('pred_final_linear_layer', True)
         self.model = nn.Sequential()
         if type == 'encoder':
-            self.build_encoder()
+            in_size_ = hparams['input_size'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['n_hid_units'] if out_size is None else out_size
+            self.build_encoder(in_size=in_size_, hid_size=hid_size_, out_size=out_size_)
         else:
-            self.build_decoder()
+            in_size_ = hparams['n_hid_units'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['input_size'] if out_size is None else out_size
+            self.build_decoder(in_size=in_size_, hid_size=hid_size_, out_size=out_size_)
 
-    def build_encoder(self):
+    def build_encoder(self, in_size, hid_size, out_size):
         """Construct encoder model using hparams."""
 
         global_layer_num = 0
@@ -34,12 +39,18 @@ class DilatedTCN(BaseModel):
         for i_layer in range(self.hparams['n_hid_layers']):
 
             dilation = 2 ** i_layer
-            in_size = self.hparams['input_size'] if i_layer == 0 else self.hparams['n_hid_units']
-            out_size = self.hparams['n_hid_units']
+            in_size_ = in_size if i_layer == 0 else hid_size
+            hid_size_ = hid_size
+            if i_layer == (self.hparams['n_hid_layers'] - 1):
+                # final layer
+                out_size_ = out_size
+            else:
+                # intermediate layer
+                out_size_ = hid_size
 
             # conv -> activation -> dropout (+ residual)
             tcn_block = DilationBlock(
-                input_size=in_size, int_size=out_size, output_size=out_size,
+                input_size=in_size_, int_size=hid_size_, output_size=out_size_,
                 kernel_size=self.hparams['n_lags'], stride=1, dilation=dilation,
                 activation=self.hparams['activation'], dropout=self.hparams.get('dropout', 0.2))
             name = 'tcn_block_%02i' % global_layer_num
@@ -50,32 +61,34 @@ class DilatedTCN(BaseModel):
 
         return global_layer_num
 
-    def build_decoder(self):
+    def build_decoder(self, in_size, hid_size, out_size):
         """Construct the decoder using hparams."""
 
         global_layer_num = 0
 
+        out_size_ = in_size  # set "output size" of the layer that feeds into this module
         for i_layer in range(self.hparams['n_hid_layers']):
 
             dilation = 2 ** (self.hparams['n_hid_layers'] - i_layer - 1)  # down by powers of 2
-            in_size = self.hparams['n_hid_units']
+            in_size_ = out_size_  # input is output size of previous block
+            hid_size_ = hid_size
             if i_layer == (self.hparams['n_hid_layers'] - 1):
                 # final layer
                 # out_size = self.hparams['input_size']
                 # final_activation = 'linear'
                 # predictor_block = True
-                out_size = self.hparams['n_hid_units']
+                out_size_ = out_size
                 final_activation = self.hparams['activation']
                 predictor_block = False
             else:
                 # intermediate layer
-                out_size = self.hparams['n_hid_units']
+                out_size_ = hid_size
                 final_activation = self.hparams['activation']
                 predictor_block = False
 
             # conv -> activation -> dropout (+ residual)
             tcn_block = DilationBlock(
-                input_size=in_size, int_size=in_size, output_size=out_size,
+                input_size=in_size_, int_size=hid_size_, output_size=out_size_,
                 kernel_size=self.hparams['n_lags'], stride=1, dilation=dilation,
                 activation=self.hparams['activation'], final_activation=final_activation,
                 dropout=self.hparams.get('dropout', 0.2), predictor_block=predictor_block)
@@ -86,12 +99,11 @@ class DilatedTCN(BaseModel):
             global_layer_num += 1
 
         # add final fully-connected layer
-        if self.hparams['pred_final_linear_layer']:
-            dense = nn.Conv1d(
-                in_channels=out_size,
-                out_channels=self.hparams['input_size'],
-                kernel_size=1)  # kernel_size=1 <=> dense, fully connected layer
-            self.model.add_module('final_dense_%02i' % global_layer_num, dense)
+        dense = nn.Conv1d(
+            in_channels=out_size,
+            out_channels=out_size,
+            kernel_size=1)  # kernel_size=1 <=> dense, fully connected layer
+        self.model.add_module('final_dense_%02i' % global_layer_num, dense)
 
         return global_layer_num
 

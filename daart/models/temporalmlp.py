@@ -13,7 +13,7 @@ __all__ = ['TemporalMLP']
 class TemporalMLP(BaseModel):
     """MLP network with initial 1D convolution layer."""
 
-    def __init__(self, hparams, type='encoder'):
+    def __init__(self, hparams, type='encoder', in_size=None, hid_size=None, out_size=None):
 
         super().__init__()
         self.hparams = hparams
@@ -34,11 +34,17 @@ class TemporalMLP(BaseModel):
 
         self.model = nn.ModuleList()
         if type == 'encoder':
-            self.build_encoder()
+            in_size_ = hparams['input_size'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['n_hid_units'] if out_size is None else out_size
+            self.build_encoder(in_size=in_size_, hid_size=hid_size_, out_size=out_size_)
         else:
-            self.build_decoder()
+            in_size_ = hparams['n_hid_units'] if in_size is None else in_size
+            hid_size_ = hparams['n_hid_units'] if hid_size is None else hid_size
+            out_size_ = hparams['input_size'] if out_size is None else out_size
+            self.build_decoder(in_size=in_size_, hid_size=hid_size_, out_size=out_size_)
 
-    def build_encoder(self):
+    def build_encoder(self, in_size, hid_size, out_size):
         """Construct the encoder using hparams."""
 
         global_layer_num = 0
@@ -46,11 +52,9 @@ class TemporalMLP(BaseModel):
         # -------------------------------------------------------------
         # first layer is 1d conv for incorporating past/future activity
         # -------------------------------------------------------------
-        in_size = self.hparams['input_size']
-        out_size = self.hparams['n_hid_units']
         layer = nn.Conv1d(
             in_channels=in_size,
-            out_channels=out_size,
+            out_channels=hid_size,
             kernel_size=self.hparams['n_lags'] * 2 + 1,  # window around t
             padding=self.hparams['n_lags'])  # same output
         name = str('conv1d_layer_%02i' % global_layer_num)
@@ -67,7 +71,6 @@ class TemporalMLP(BaseModel):
 
         # update layer info
         global_layer_num += 1
-        in_size = out_size
 
         # -------------------------------------------------------------
         # remaining layers
@@ -75,43 +78,45 @@ class TemporalMLP(BaseModel):
         # loop over hidden layers (0 layers <-> linear model)
         for i_layer in range(self.hparams['n_hid_layers']):
 
+            if i_layer == self.hparams['n_hid_layers'] - 1:
+                activation = None  # cross entropy loss handles this
+                out_size_ = out_size
+            else:
+                activation = self.activation_func
+                out_size_ = hid_size
+
             # add layer
-            layer = nn.Linear(in_features=in_size, out_features=out_size)
+            layer = nn.Linear(in_features=hid_size, out_features=out_size_)
             name = str('dense_layer_%02i' % global_layer_num)
             self.model.add_module(name, layer)
 
             # add activation
-            if i_layer == self.hparams['n_hid_layers'] - 1:
-                activation = None  # cross entropy loss handles this
-            else:
-                activation = self.activation_func
             if activation:
                 name = '%s_%02i' % (self.hparams['activation'], global_layer_num)
                 self.model.add_module(name, activation)
 
             # update layer info
             global_layer_num += 1
-            in_size = out_size
 
         return global_layer_num
 
-    def build_decoder(self):
+    def build_decoder(self, in_size, hid_size, out_size):
         """Construct the vanilla MLP decoder using hparams."""
 
         global_layer_num = 0
 
-        in_size = self.hparams['n_hid_units']
+        in_size_ = in_size
 
         # loop over hidden layers (0 layers <-> linear model)
         for i_layer in range(self.hparams['n_hid_layers'] + 1):
 
             if i_layer == self.hparams['n_hid_layers']:
-                out_size = self.hparams['input_size']
+                out_size_ = out_size
             else:
-                out_size = self.hparams['n_hid_units']
+                out_size_ = hid_size
 
             # add layer
-            layer = nn.Linear(in_features=in_size, out_features=out_size)
+            layer = nn.Linear(in_features=in_size_, out_features=out_size_)
             name = str('dense_layer_%02i' % global_layer_num)
             self.model.add_module(name, layer)
 
@@ -127,7 +132,7 @@ class TemporalMLP(BaseModel):
 
             # update layer info
             global_layer_num += 1
-            in_size = out_size
+            in_size_ = out_size_
 
         return global_layer_num
 
