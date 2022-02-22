@@ -402,7 +402,7 @@ class Segmenter(BaseModel):
             'sample': z,  # (n_sequences, sequence_length, embedding_dim)
         }
 
-    def predict_labels(self, data_generator, return_scores=False, remove_pad=True):
+    def predict_labels(self, data_generator, return_scores=False, remove_pad=True, mode='eval'):
         """
 
         Parameters
@@ -413,6 +413,8 @@ class Segmenter(BaseModel):
             return scores before they've been passed through softmax
         remove_pad : bool
             remove batch padding from model outputs before returning
+        mode : str
+            'eval' | 'train'
 
         Returns
         -------
@@ -424,7 +426,13 @@ class Segmenter(BaseModel):
             - 'labels' (list of lists): corresponding labels
 
         """
-        self.eval()
+        if mode == 'eval':
+            self.eval()
+        elif mode == 'train':
+            self.train()
+        else:
+            raise NotImplementedError(
+                'must choose mode="eval" or mode="train", not mode="%s"' % mode)
 
         pad = self.hparams.get('sequence_pad', 0)
 
