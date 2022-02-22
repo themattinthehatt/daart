@@ -255,6 +255,7 @@ class SingleDataset(data.Dataset):
             self.dtypes[signal] = None  # update when loading data
 
         self.sequence_pad = sequence_pad
+        self.sequence_length = sequence_length
         self.load_data(sequence_length, input_type)
         self.n_sequences = len(self.data[signals[0]])
 
