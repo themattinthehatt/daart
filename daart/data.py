@@ -28,6 +28,7 @@ from typeguard import typechecked
 
 __all__ = [
     'split_trials', 'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'DataGenerator',
+    'load_marker_csv', 'load_feature_csv', 'load_marker_h5', 'load_label_csv', 'load_label_pkl',
 ]
 
 
@@ -338,55 +339,34 @@ class SingleDataset(data.Dataset):
                 file_ext = self.paths[signal].split('.')[-1]
 
                 if file_ext == 'csv':
-
                     if input_type == 'markers':
-                        # assume dlc/dgp format
-
-                        # drop first column ('scorer' at level 0) which just contains frame indices
-                        df = pd.read_csv(
-                            self.paths[signal], header=[0, 1, 2]).drop(['scorer'], axis=1, level=0)
-                        markers = df.values
-                        x = markers[:, 0::3]
-                        y = markers[:, 1::3]
-                        data_curr = np.hstack([x, y])
-
+                        xs, ys, ls, marker_names = load_marker_csv(self.paths[signal])
+                        data_curr = np.hstack([xs, ys])
                     else:
-                        # assume csv with single header row
-                        df = pd.read_csv(self.paths[signal]).drop(['Unnamed: 0'], axis=1)
-                        data_curr = df.values
+                        vals, feature_names = load_feature_csv(self.paths[signal])
+                        data_curr = vals
 
                 elif file_ext == 'h5':
-
                     if input_type != 'markers':
                         raise NotImplementedError
-
-                    # assume dlc/dgp format
-                    df = pd.read_hdf(self.paths[signal])
-                    markers = df.to_numpy()
-                    x = markers[:, 0::3]
-                    y = markers[:, 1::3]
-                    data_curr = np.hstack([x, y])
+                    xs, ys, ls, marker_names = load_marker_h5(self.paths[signal])
+                    data_curr = np.hstack([xs, ys])
 
                 elif file_ext == 'npy':
-
                     # assume single array
                     data_curr = np.load(self.paths[signal])
 
                 else:
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
 
-                # l = dlc[:, 2::3]
                 self.dtypes[signal] = 'float32'
 
             elif signal == 'tasks':
 
                 file_ext = self.paths[signal].split('.')[-1]
-
                 if file_ext == 'csv':
-
-                    # assume csv with single header row
-                    df = pd.read_csv(self.paths[signal]).drop(['Unnamed: 0'], axis=1)
-                    data_curr = df.values
+                    vals, feature_names = load_feature_csv(self.paths[signal])
+                    data_curr = vals
 
                 else:
                     raise ValueError('"%s" is an invalid file extension' % file_ext)
@@ -404,11 +384,8 @@ class SingleDataset(data.Dataset):
                         raise FileNotFoundError(
                             'Could not load "labels_strong" from None file without markers')
                 else:
-                    # assume csv output from deepethogram labeler
-                    labels = np.genfromtxt(
-                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
-                        skip_header=1)
-                    data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
+                    labels, label_names = load_label_csv(self.paths[signal])
+                    data_curr = np.argmax(labels, axis=1)
 
                 self.dtypes[signal] = 'int32'
 
@@ -417,15 +394,12 @@ class SingleDataset(data.Dataset):
                 file_ext = self.paths[signal].split('.')[-1]
 
                 if file_ext == 'csv':
-                    # assume same format as strong label csv files
-                    labels = np.genfromtxt(
-                        self.paths[signal], delimiter=',', dtype=np.int, encoding=None,
-                        skip_header=1)
-                    data_curr = np.argmax(labels[:, 1:], axis=1)  # get rid of index column
+                    labels, label_names = load_label_csv(self.paths[signal])
+                    data_curr = np.argmax(labels, axis=1)
+
                 elif file_ext == 'pkl':
-                    # assume particular pkl format; already in dense representation
-                    with open(self.paths[signal], 'rb') as f:
-                        data_curr = pickle.load(f)['states']
+                    labels, label_names = load_label_pkl(self.paths[signal])
+                    data_curr = labels
 
                 self.dtypes[signal] = 'int32'
 
@@ -701,3 +675,169 @@ class DataGenerator(object):
                 batch = {key: val.to('cuda') for key, val in batch.items()}
 
         return batch, datasets
+
+
+@typechecked
+def load_marker_csv(filepath: str) -> tuple:
+    """Load markers from csv file assuming DLC format.
+
+    --------------------------------------------------------------------------------
+       scorer  | <scorer_name> | <scorer_name> | <scorer_name> | <scorer_name> | ...
+     bodyparts |  <part_name>  |  <part_name>  |  <part_name>  |  <part_name>  | ...
+       coords  |       x       |       y       |  likelihood   |       x       | ...
+    --------------------------------------------------------------------------------
+         0     |     34.5      |     125.4     |     0.921     |      98.4     | ...
+         .     |       .       |       .       |       .       |       .       | ...
+         .     |       .       |       .       |       .       |       .       | ...
+         .     |       .       |       .       |       .       |       .       | ...
+
+    Parameters
+    ----------
+    filepath : str
+        absolute path of csv file
+
+    Returns
+    -------
+    tuple
+        - x coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - y coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - likelihoods (np.ndarray): shape (n_t,)
+        - marker names (list): name for each column of `x` and `y` matrices
+
+    """
+    # data = np.genfromtxt(filepath, delimiter=',', dtype=None, encoding=None)
+    # marker_names = list(data[1, 1::3])
+    # markers = data[3:, 1:].astype('float')  # get rid of headers, etc.
+
+    # define first three rows as headers (as per DLC standard)
+    # drop first column ('scorer' at level 0) which just contains frame indices
+    df = pd.read_csv(filepath, header=[0, 1, 2]).drop(['scorer'], axis=1, level=0)
+    # collect marker names from multiindex header
+    marker_names = [c[1] for c in df.columns[::3]]
+    markers = df.values
+    xs = markers[:, 0::3]
+    ys = markers[:, 1::3]
+    ls = markers[:, 2::3]
+    return xs, ys, ls, marker_names
+
+
+@typechecked
+def load_feature_csv(filepath: str) -> tuple:
+    """Load markers from csv file assuming the following format.
+
+    --------------------------------------------------------------------------------
+        name   |     <f1>      |     <f2>      |     <f3>      |     <f4>      | ...
+    --------------------------------------------------------------------------------
+         0     |     34.5      |     125.4     |     0.921     |      98.4     | ...
+         .     |       .       |       .       |       .       |       .       | ...
+         .     |       .       |       .       |       .       |       .       | ...
+         .     |       .       |       .       |       .       |       .       | ...
+
+    Parameters
+    ----------
+    filepath : str
+        absolute path of csv file
+
+    Returns
+    -------
+    tuple
+        - x coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - y coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - likelihoods (np.ndarray): shape (n_t,)
+        - marker names (list): name for each column of `x` and `y` matrices
+
+    """
+    df = pd.read_csv(filepath)
+    # drop first column if it just contains frame indices
+    unnamed_col = 'Unnamed: 0'
+    if unnamed_col in list(df.columns):
+        df = df.drop([unnamed_col], axis=1)
+    vals = df.values
+    feature_names = list(df.columns)
+    return vals, feature_names
+
+
+@typechecked
+def load_marker_h5(filepath: str) -> tuple:
+    """Load markers from hdf5 file assuming DLC format.
+
+    Parameters
+    ----------
+    filepath : str
+        absolute path of hdf5 file
+
+    Returns
+    -------
+    tuple
+        - x coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - y coordinates (np.ndarray): shape (n_t, n_bodyparts)
+        - likelihoods (np.ndarray): shape (n_t,)
+        - marker names (list): name for each column of `x` and `y` matrices
+
+    """
+    df = pd.read_hdf(filepath)
+    marker_names = [d[1] for d in df.columns][0::3]
+    markers = df.to_numpy()
+    xs = markers[:, 0::3]
+    ys = markers[:, 1::3]
+    ls = markers[:, 2::3]
+    return xs, ys, ls, marker_names
+
+
+@typechecked
+def load_label_csv(filepath: str) -> tuple:
+    """Load labels from csv file assuming a standard format.
+
+    --------------------------------
+       | <class 0> | <class 1> | ...
+    --------------------------------
+     0 |     0     |     1     | ...
+     1 |     0     |     1     | ...
+     . |     .     |     .     | ...
+     . |     .     |     .     | ...
+     . |     .     |     .     | ...
+
+    Parameters
+    ----------
+    filepath : str
+        absolute path of csv file
+
+    Returns
+    -------
+    tuple
+        - labels (np.ndarray): shape (n_t, n_labels)
+        - label names (list): name for each column in `labels` matrix
+
+    """
+    labels = np.genfromtxt(
+        filepath, delimiter=',', dtype=np.int, encoding=None, skip_header=1)[:, 1:]
+    label_names = list(
+        np.genfromtxt(filepath, delimiter=',', dtype=None, encoding=None, max_rows=1)[1:])
+    return labels, label_names
+
+
+@typechecked
+def load_label_pkl(filepath: str) -> tuple:
+    """Load labels from pkl file assuming a standard format.
+
+    Parameters
+    ----------
+    filepath : str
+        absolute path of pickle file
+
+    Returns
+    -------
+    tuple
+        - labels (np.ndarray): shape (n_t, n_labels)
+        - label names (list): name for each column in `labels` matrix
+
+    """
+    with open(filepath, 'rb') as f:
+        data = pickle.load(f)
+    labels = data['states']
+    try:
+        label_dict = data['state_mapping']
+    except KeyError:
+        label_dict = data['state_labels']
+    label_names = [label_dict[i] for i in range(len(label_dict))]
+    return labels, label_names
