@@ -103,7 +103,10 @@ def get_model_dir(base_dir: str, model_params: dict) -> str:
         absolute path of model directory
 
     """
-    model_dir = model_params['backbone']
+    if model_params['model_type'] == 'segmenter':
+        model_dir = model_params['backbone']
+    else:
+        model_dir = model_params['model_type']
     return os.path.join(base_dir, model_dir, model_params.get('experiment_name', ''))
 
 
@@ -123,10 +126,12 @@ def get_model_params(hparams: dict) -> dict:
 
     """
 
+    model_class = hparams['model_class']
     backbone = hparams['backbone']
 
     # start with general params
     hparams_less = {
+        'model_class': model_class,
         'rng_seed_train': hparams['rng_seed_train'],
         'rng_seed_model': hparams['rng_seed_model'],
         'trial_splits': hparams['trial_splits'],
@@ -143,45 +148,51 @@ def get_model_params(hparams: dict) -> dict:
         'variational': hparams.get('variational', False),
     }
 
-    # get backbone-specific params
-    if backbone == 'temporal-mlp':
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['n_lags'] = hparams['n_lags']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-    elif backbone in ['lstm', 'gru']:
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-        hparams_less['bidirectional'] = hparams['bidirectional']
-    elif backbone in ['tcn', 'dtcn']:
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['n_lags'] = hparams['n_lags']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-        if backbone == 'dtcn':
-            hparams_less['dropout'] = hparams['dropout']
-    elif backbone == 'random-forest':
+    if model_class == 'segmenter':
+        # get backbone-specific params
+        if backbone == 'temporal-mlp':
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['n_lags'] = hparams['n_lags']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+        elif backbone in ['lstm', 'gru']:
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+            hparams_less['bidirectional'] = hparams['bidirectional']
+        elif backbone in ['tcn', 'dtcn']:
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['n_lags'] = hparams['n_lags']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+            if backbone == 'dtcn':
+                hparams_less['dropout'] = hparams['dropout']
+        else:
+            raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
+
+        # get other params
+        if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
+            hparams_less['prob_threshold'] = hparams['prob_threshold']
+            hparams_less['anneal_start'] = hparams['anneal_start']
+            hparams_less['anneal_end'] = hparams['anneal_end']
+
+    elif model_class == 'random-forest':
+        hparams_less.pop('backbone')
+        hparams_less.pop('batch_size')
+        hparams_less.pop('semi_supervised_algo')
+        hparams_less.pop('variational')
         hparams_less.pop('lambda_weak')
         hparams_less.pop('lambda_strong')
         hparams_less.pop('lambda_pred')
-    else:
-        raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
-
-    # get other params
-    if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
-        hparams_less['prob_threshold'] = hparams['prob_threshold']
-        hparams_less['anneal_start'] = hparams['anneal_start']
-        hparams_less['anneal_end'] = hparams['anneal_end']
 
     return hparams_less
 
