@@ -176,23 +176,24 @@ def compute_sequence_pad(hparams: dict) -> int:
 
     """
 
-    if hparams['backbone'].lower() == 'temporal-mlp':
-        pad = hparams['n_lags']
-    elif hparams['backbone'].lower() == 'tcn':
-        pad = (2 ** hparams['n_hid_layers']) * hparams['n_lags']
-    elif hparams['backbone'].lower() == 'dtcn':
-        # dilattion of each dilation block is 2 ** layer_num
-        # 2 conv layers per dilation block
-        pad = sum([2 * (2 ** n) * hparams['n_lags'] for n in range(hparams['n_hid_layers'])])
-    elif hparams['backbone'].lower() in ['lstm', 'gru']:
-        # give some warmup timesteps
-        pad = 4
-    elif hparams['backbone'].lower() == 'tgm':
-        raise NotImplementedError
-    elif hparam['backbone'].lower() == 'random-forest':
+    if hparams['model_class'] == 'random-forest':
         pad = 0
     else:
-        raise ValueError('"%s" is not a valid backbone network' % hparams['backbone'])
+        if hparams['backbone'].lower() == 'temporal-mlp':
+            pad = hparams['n_lags']
+        elif hparams['backbone'].lower() == 'tcn':
+            pad = (2 ** hparams['n_hid_layers']) * hparams['n_lags']
+        elif hparams['backbone'].lower() == 'dtcn':
+            # dilattion of each dilation block is 2 ** layer_num
+            # 2 conv layers per dilation block
+            pad = sum([2 * (2 ** n) * hparams['n_lags'] for n in range(hparams['n_hid_layers'])])
+        elif hparams['backbone'].lower() in ['lstm', 'gru']:
+            # give some warmup timesteps
+            pad = 4
+        elif hparams['backbone'].lower() == 'tgm':
+            raise NotImplementedError
+        else:
+            raise ValueError('"%s" is not a valid backbone network' % hparams['backbone'])
 
     return pad
 

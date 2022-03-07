@@ -103,10 +103,10 @@ def get_model_dir(base_dir: str, model_params: dict) -> str:
         absolute path of model directory
 
     """
-    if model_params['model_type'] == 'segmenter':
+    if model_params['model_class'] == 'segmenter':
         model_dir = model_params['backbone']
     else:
-        model_dir = model_params['model_type']
+        model_dir = model_params['model_class']
     return os.path.join(base_dir, model_dir, model_params.get('experiment_name', ''))
 
 
