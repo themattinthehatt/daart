@@ -139,17 +139,32 @@ def get_model_params(hparams: dict) -> dict:
         'backbone': hparams['backbone'],
         'sequence_length': hparams['sequence_length'],
         'batch_size': hparams['batch_size'],
-        'lambda_weak': hparams['lambda_weak'],
-        'lambda_strong': hparams['lambda_strong'],
-        'lambda_pred': hparams['lambda_pred'],
-        'lambda_task': hparams.get('lambda_task', 0),
         'input_type': hparams['input_type'],
-        'semi_supervised_algo': hparams.get('semi_supervised_algo', None),
-        'variational': hparams.get('variational', False),
     }
 
     if model_class == 'segmenter':
-        # get backbone-specific params
+        hparams_less['lambda_weak'] = hparams['lambda_weak']
+        hparams_less['lambda_strong'] = hparams['lambda_strong']
+        hparams_less['lambda_pred'] = hparams['lambda_pred']
+        hparams_less['lambda_task'] = hparams.get('lambda_task', 0)
+        hparams_less['variational'] = hparams.get('variational', False)
+        hparams_less['semi_supervised_algo'] = hparams.get('semi_supervised_algo', None)
+        if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
+            hparams_less['prob_threshold'] = hparams['prob_threshold']
+            hparams_less['anneal_start'] = hparams['anneal_start']
+            hparams_less['anneal_end'] = hparams['anneal_end']
+
+    elif model_class == 'random-forest' or model_class == 'xgboost':
+        hparams_less.pop('rng_seed_train')
+        hparams_less.pop('backbone')
+        hparams_less.pop('sequence_length')
+        hparams_less.pop('batch_size')
+
+    else:
+        raise NotImplementedError('"%s" is not a valid model class' % model_class)
+
+    # get backbone-specific params
+    if model_class == 'segmenter':
         if backbone == 'temporal-mlp':
             hparams_less['learning_rate'] = hparams['learning_rate']
             hparams_less['n_hid_layers'] = hparams['n_hid_layers']
@@ -178,21 +193,6 @@ def get_model_params(hparams: dict) -> dict:
                 hparams_less['dropout'] = hparams['dropout']
         else:
             raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
-
-        # get other params
-        if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
-            hparams_less['prob_threshold'] = hparams['prob_threshold']
-            hparams_less['anneal_start'] = hparams['anneal_start']
-            hparams_less['anneal_end'] = hparams['anneal_end']
-
-    elif model_class == 'random-forest':
-        hparams_less.pop('backbone')
-        hparams_less.pop('batch_size')
-        hparams_less.pop('semi_supervised_algo')
-        hparams_less.pop('variational')
-        hparams_less.pop('lambda_weak')
-        hparams_less.pop('lambda_strong')
-        hparams_less.pop('lambda_pred')
 
     return hparams_less
 

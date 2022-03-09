@@ -176,7 +176,7 @@ def compute_sequence_pad(hparams: dict) -> int:
 
     """
 
-    if hparams['model_class'] == 'random-forest':
+    if hparams['model_class'] == 'random-forest' or hparams['model_class'] == 'xgboost':
         pad = 0
     else:
         if hparams['backbone'].lower() == 'temporal-mlp':
