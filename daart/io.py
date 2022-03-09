@@ -198,7 +198,8 @@ def get_model_params(hparams: dict) -> dict:
 
 
 @typechecked
-def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
+def find_experiment(
+        hparams: dict, verbose: bool = False, keys_to_sweep: List[str] = []) -> List[str]:
     """Search testtube versions to find if experiment with the same hyperparameters has been fit.
 
     Parameters
@@ -208,12 +209,12 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
         parameters)
     verbose : bool
         True to print desired hparams
+    keys_to_sweep : list of strs
+        these can be any value
 
     Returns
     -------
-    variable
-        - int if experiment is found
-        - None if experiment is not found
+    list
 
     """
 
@@ -231,12 +232,16 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
         tt_versions = get_subdirs(tt_expt_dir)
     except StopIteration:
         # no versions yet
-        return None
+        return []
 
     # get model-specific params
-    hparams_less = get_model_params(hparams)
-    found_match = False
-    version = None
+    hparams_req = get_model_params(hparams)
+
+    # remove params if we don't want a specific value
+    for key in keys_to_sweep:
+        del hparams_req[key]
+
+    version_list = []
     for version in tt_versions:
         # try to load hparams
         try:
@@ -250,17 +255,19 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
                 with open(version_file, 'r') as f:
                     hparams_ = yaml.safe_load(f)
 
-            if all([hparams_[key] == hparams_less[key] for key in hparams_less.keys()]):
+            if all([hparams_[key] == hparams_req[key] for key in hparams_req.keys()]):
                 # found match - did it finish training?
                 if hparams_['training_completed']:
-                    found_match = True
-                    break
+                    version_list.append(os.path.join(tt_expt_dir, version))
+                    if len(keys_to_sweep) == 0:
+                        # we found the only model we're looking for
+                        break
             else:
                 if verbose:
                     print('unmatched keys, %s:' % version)
-                    for key in hparams_less.keys():
-                        if hparams_[key] != hparams_less[key]:
-                            print('{}: {} vs {}'.format(key, hparams_[key], hparams_less[key]))
+                    for key in hparams_req.keys():
+                        if hparams_[key] != hparams_req[key]:
+                            print('{}: {} vs {}'.format(key, hparams_[key], hparams_req[key]))
                     print()
 
         except IOError:
@@ -270,12 +277,10 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
             # usually occurs when checking older models against newer models with more hparams
             continue
 
-    if found_match:
-        return int(version.split('_')[-1])
-    else:
-        if verbose:
-            print('could not find match for requested hyperparameters: {}'.format(hparams_less))
-        return None
+    if len(version_list) == 0 and verbose:
+        print('could not find match for requested hyperparameters: {}'.format(hparams_req))
+
+    return version_list
 
 
 @typechecked

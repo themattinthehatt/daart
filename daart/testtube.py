@@ -89,7 +89,7 @@ def create_tt_experiment(hparams):
         os.makedirs(tt_expt_dir)
 
     # check to see if experiment already exists
-    if find_experiment(hparams) is not None:
+    if len(find_experiment(hparams)) > 0:
         return None, None
 
     exp = Experiment(

@@ -289,7 +289,7 @@ def check_model(config_dicts):
     #     if isinstance(val, list):
     #         hparams[key] = val[-1]
     exists = find_experiment(hparams)
-    if exists is not None:
+    if len(exists) > 0:
         result_str = BOLD + CGREEN + 'passed' + CEND
     else:
         result_str = BOLD + CRED + 'failed' + CEND
