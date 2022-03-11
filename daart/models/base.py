@@ -311,9 +311,10 @@ class Segmenter(BaseModel):
 
         # task regression: single linear layer
         if self.hparams.get('lambda_task', 0) > 0:
-            self.model['task_predictor'] = self._build_linear(
-                global_layer_num=global_layer_num, name='regression',
-                in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
+            self.model['task_predictor'] = self._build_mlp(
+                global_layer_num=global_layer_num, in_size=self.hparams['n_hid_units'],
+                hid_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'],
+                n_hid_layers=1)
 
     def forward(self, x):
         """Process input data.
