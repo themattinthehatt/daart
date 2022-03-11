@@ -86,8 +86,7 @@ class BaseModel(nn.Module):
 
     @staticmethod
     def _build_mlp(
-            self, global_layer_num, in_size, hid_size, out_size, n_hid_layers=1,
-            activation='lrelu'):
+            global_layer_num, in_size, hid_size, out_size, n_hid_layers=1, activation='lrelu'):
 
         mlp = nn.Sequential()
 
