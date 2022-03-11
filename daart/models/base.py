@@ -574,10 +574,15 @@ class Segmenter(BaseModel):
                 outputs_dict['labels_weak'], (-1, outputs_dict['labels_weak'].shape[-1]))
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
-                loss_weak = self.class_loss(
-                    labels_weak_reshape[labels_strong == 0], labels_weak[labels_strong == 0])
+                idxs_ = labels_strong == 0
+                if torch.sum(idxs_) > 0:
+                    loss_weak = self.class_loss(labels_weak_reshape[idxs_], labels_weak[idxs_])
+                else:
+                    # if all timepoints are labeled, set weak loss to zero
+                    loss_weak = torch.tensor([0.], device=labels_strong.device)
             else:
                 loss_weak = self.class_loss(labels_weak_reshape, labels_weak)
+
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
             loss_dict['loss_weak'] = loss_weak_val
