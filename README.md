@@ -5,7 +5,16 @@ following types of base models on behavioral time series data:
 * RNNs - both LSTMs and GRUs
 * Temporal Convolutional Networks (TCNs)
 
+If you use daart in your analysis of behavioral data, please cite our preprint!
 
+    @inproceedings{whiteway2021semi,
+      title={Semi-supervised sequence modeling for improved behavioral segmentation},
+      author={Whiteway, Matthew R and Schaffer, Evan S and Wu, Anqi and Buchanan, E Kelly and Onder, Omer F and Mishra, Neeli and Paninski, Liam},
+      journal={bioRxiv},
+      year={2021},
+      publisher={Cold Spring Harbor Laboratory}
+    }
+    
 ## Installation
 
 First you'll have to install the `git` package in order to access the code on github. Follow the 
