@@ -153,6 +153,11 @@ def get_model_params(hparams: dict) -> dict:
             hparams_less['prob_threshold'] = hparams['prob_threshold']
             hparams_less['anneal_start'] = hparams['anneal_start']
             hparams_less['anneal_end'] = hparams['anneal_end']
+        elif hparams_less['semi_supervised_algo'] == 'ups':
+            hparams_less['prob_threshold'] = hparams['prob_threshold']
+            hparams_less['variance_threshold'] = hparams['variance_threshold']
+            hparams_less['anneal_start'] = hparams['anneal_start']
+            hparams_less['anneal_end'] = hparams['anneal_end']
 
     elif model_class == 'random-forest' or model_class == 'xgboost':
         hparams_less.pop('rng_seed_train')
