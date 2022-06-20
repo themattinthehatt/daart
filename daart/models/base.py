@@ -198,7 +198,7 @@ class Segmenter(BaseModel):
             raise NotImplementedError("classifier type must be 'multiclass' or 'binary'")
         weight = hparams.get('class_weights', None)
         if weight is not None:
-            weight = torch.tensor(weight)
+            weight = torch.tensor(weight, dtype=torch.float32)
         self.class_loss = nn.CrossEntropyLoss(
             weight=weight, ignore_index=ignore_index, reduction='mean')
         self.pred_loss = nn.MSELoss(reduction='mean')
