@@ -111,8 +111,8 @@ class BlockShuffle(Transform):
 class MakeOneHot(Transform):
     """Turn a categorical vector into a one-hot vector."""
 
-    def __init__(self):
-        pass
+    def __init__(self, n_classes=None):
+        self.n_classes = n_classes
 
     def __call__(self, sample):
         """Assumes that K classes are identified by the numbers 0:K-1.
@@ -132,7 +132,7 @@ class MakeOneHot(Transform):
             onehot = sample
         else:
             n_time = len(sample)
-            n_classes = int(np.nanmax(sample))
+            n_classes = self.n_classes or int(np.nanmax(sample))
             onehot = np.zeros((n_time, n_classes + 1))
             if not any(np.isnan(sample)):
                 onehot[np.arange(n_time), sample.astype('int')] = 1
