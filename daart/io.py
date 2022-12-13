@@ -103,7 +103,10 @@ def get_model_dir(base_dir: str, model_params: dict) -> str:
         absolute path of model directory
 
     """
-    model_dir = model_params['backbone']
+    if model_params['model_class'] == 'segmenter':
+        model_dir = model_params['backbone']
+    else:
+        model_dir = model_params['model_class']
     return os.path.join(base_dir, model_dir, model_params.get('experiment_name', ''))
 
 
@@ -123,10 +126,12 @@ def get_model_params(hparams: dict) -> dict:
 
     """
 
+    model_class = hparams['model_class']
     backbone = hparams['backbone']
 
     # start with general params
     hparams_less = {
+        'model_class': model_class,
         'rng_seed_train': hparams['rng_seed_train'],
         'rng_seed_model': hparams['rng_seed_model'],
         'trial_splits': hparams['trial_splits'],
@@ -134,60 +139,72 @@ def get_model_params(hparams: dict) -> dict:
         'backbone': hparams['backbone'],
         'sequence_length': hparams['sequence_length'],
         'batch_size': hparams['batch_size'],
-        'lambda_weak': hparams['lambda_weak'],
-        'lambda_strong': hparams['lambda_strong'],
-        'lambda_pred': hparams['lambda_pred'],
-        'lambda_task': hparams.get('lambda_task', 0),
         'input_type': hparams['input_type'],
-        'semi_supervised_algo': hparams.get('semi_supervised_algo', None),
-        'variational': hparams.get('variational', False),
     }
 
-    # get backbone-specific params
-    if backbone == 'temporal-mlp':
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['n_lags'] = hparams['n_lags']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-    elif backbone in ['lstm', 'gru']:
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-        hparams_less['bidirectional'] = hparams['bidirectional']
-    elif backbone in ['tcn', 'dtcn']:
-        hparams_less['learning_rate'] = hparams['learning_rate']
-        hparams_less['n_hid_layers'] = hparams['n_hid_layers']
-        if hparams['n_hid_layers'] != 0:
-            hparams_less['n_hid_units'] = hparams['n_hid_units']
-        hparams_less['n_lags'] = hparams['n_lags']
-        hparams_less['activation'] = hparams['activation']
-        hparams_less['l2_reg'] = hparams['l2_reg']
-        if backbone == 'dtcn':
-            hparams_less['dropout'] = hparams['dropout']
-    elif backbone == 'random-forest':
-        hparams_less.pop('lambda_weak')
-        hparams_less.pop('lambda_strong')
-        hparams_less.pop('lambda_pred')
-    else:
-        raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
+    if model_class == 'segmenter':
+        hparams_less['lambda_weak'] = hparams['lambda_weak']
+        hparams_less['lambda_strong'] = hparams['lambda_strong']
+        hparams_less['lambda_pred'] = hparams['lambda_pred']
+        hparams_less['lambda_task'] = hparams.get('lambda_task', 0)
+        hparams_less['variational'] = hparams.get('variational', False)
+        hparams_less['semi_supervised_algo'] = hparams.get('semi_supervised_algo', None)
+        if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
+            hparams_less['prob_threshold'] = hparams['prob_threshold']
+            hparams_less['anneal_start'] = hparams['anneal_start']
+            hparams_less['anneal_end'] = hparams['anneal_end']
+        elif hparams_less['semi_supervised_algo'] == 'ups':
+            hparams_less['prob_threshold'] = hparams['prob_threshold']
+            hparams_less['variance_threshold'] = hparams['variance_threshold']
+            hparams_less['anneal_start'] = hparams['anneal_start']
+            hparams_less['anneal_end'] = hparams['anneal_end']
 
-    # get other params
-    if hparams_less['semi_supervised_algo'] == 'pseudo_labels':
-        hparams_less['prob_threshold'] = hparams['prob_threshold']
-        hparams_less['anneal_start'] = hparams['anneal_start']
-        hparams_less['anneal_end'] = hparams['anneal_end']
+    elif model_class == 'random-forest' or model_class == 'xgboost':
+        hparams_less.pop('rng_seed_train')
+        hparams_less.pop('backbone')
+        hparams_less.pop('sequence_length')
+        hparams_less.pop('batch_size')
+
+    else:
+        raise NotImplementedError('"%s" is not a valid model class' % model_class)
+
+    # get backbone-specific params
+    if model_class == 'segmenter':
+        if backbone == 'temporal-mlp':
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['n_lags'] = hparams['n_lags']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+        elif backbone in ['lstm', 'gru']:
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+            hparams_less['bidirectional'] = hparams['bidirectional']
+        elif backbone in ['tcn', 'dtcn']:
+            hparams_less['learning_rate'] = hparams['learning_rate']
+            hparams_less['n_hid_layers'] = hparams['n_hid_layers']
+            if hparams['n_hid_layers'] != 0:
+                hparams_less['n_hid_units'] = hparams['n_hid_units']
+            hparams_less['n_lags'] = hparams['n_lags']
+            hparams_less['activation'] = hparams['activation']
+            hparams_less['l2_reg'] = hparams['l2_reg']
+            if backbone == 'dtcn':
+                hparams_less['dropout'] = hparams['dropout']
+        else:
+            raise NotImplementedError('"%s" is not a valid backbone network' % backbone)
 
     return hparams_less
 
 
 @typechecked
-def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
+def find_experiment(
+        hparams: dict, verbose: bool = False, keys_to_sweep: List[str] = []) -> List[str]:
     """Search testtube versions to find if experiment with the same hyperparameters has been fit.
 
     Parameters
@@ -197,12 +214,12 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
         parameters)
     verbose : bool
         True to print desired hparams
+    keys_to_sweep : list of strs
+        these can be any value
 
     Returns
     -------
-    variable
-        - int if experiment is found
-        - None if experiment is not found
+    list
 
     """
 
@@ -220,12 +237,16 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
         tt_versions = get_subdirs(tt_expt_dir)
     except StopIteration:
         # no versions yet
-        return None
+        return []
 
     # get model-specific params
-    hparams_less = get_model_params(hparams)
-    found_match = False
-    version = None
+    hparams_req = get_model_params(hparams)
+
+    # remove params if we don't want a specific value
+    for key in keys_to_sweep:
+        del hparams_req[key]
+
+    version_list = []
     for version in tt_versions:
         # try to load hparams
         try:
@@ -239,17 +260,19 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
                 with open(version_file, 'r') as f:
                     hparams_ = yaml.safe_load(f)
 
-            if all([hparams_[key] == hparams_less[key] for key in hparams_less.keys()]):
+            if all([hparams_[key] == hparams_req[key] for key in hparams_req.keys()]):
                 # found match - did it finish training?
                 if hparams_['training_completed']:
-                    found_match = True
-                    break
+                    version_list.append(os.path.join(tt_expt_dir, version))
+                    if len(keys_to_sweep) == 0:
+                        # we found the only model we're looking for
+                        break
             else:
                 if verbose:
                     print('unmatched keys, %s:' % version)
-                    for key in hparams_less.keys():
-                        if hparams_[key] != hparams_less[key]:
-                            print('{}: {} vs {}'.format(key, hparams_[key], hparams_less[key]))
+                    for key in hparams_req.keys():
+                        if hparams_[key] != hparams_req[key]:
+                            print('{}: {} vs {}'.format(key, hparams_[key], hparams_req[key]))
                     print()
 
         except IOError:
@@ -259,12 +282,10 @@ def find_experiment(hparams: dict, verbose: bool = False) -> Union[int, None]:
             # usually occurs when checking older models against newer models with more hparams
             continue
 
-    if found_match:
-        return int(version.split('_')[-1])
-    else:
-        if verbose:
-            print('could not find match for requested hyperparameters: {}'.format(hparams_less))
-        return None
+    if len(version_list) == 0 and verbose:
+        print('could not find match for requested hyperparameters: {}'.format(hparams_req))
+
+    return version_list
 
 
 @typechecked

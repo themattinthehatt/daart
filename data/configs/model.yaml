@@ -56,11 +56,14 @@ variational: true
 # -----------------------
 
 # define which semi-supervised algorithm to use
-# null | pseudo_labels
+# null | pseudo_labels | ups
 semi_supervised_algo: null
 
-# fixed probability threshold for pseudo-labels algorithm
+# fixed probability threshold for pseudo-labels/ups algorithm
 prob_threshold: 0.9
+
+# fixed variance threshold for ups algorithm
+variance_threshold: 0.05
 
 # define epochs where semi-supervised loss weights begin and end linear annealing
 anneal_start: 25

@@ -81,6 +81,7 @@ def train_model(hparams):
         # for example, if val_check_interval=5 and patience=20, then the model will train
         # for at least 5 * 20 = 100 epochs before training can terminate
         callbacks.append(EarlyStopping(patience=hparams['early_stop_history']))
+
     if hparams.get('semi_supervised_algo', 'none') == 'pseudo_labels':
         from daart.callbacks import AnnealHparam, PseudoLabels
         if model.hparams['lambda_weak'] == 0:
@@ -91,6 +92,19 @@ def train_model(hparams):
                 epoch_end=hparams['anneal_end']))
             callbacks.append(PseudoLabels(
                 prob_threshold=hparams['prob_threshold'], epoch_start=hparams['anneal_start']))
+    elif hparams.get('semi_supervised_algo', 'none') == 'ups':
+        from daart.callbacks import AnnealHparam, UPS
+        if model.hparams['lambda_weak'] == 0:
+            print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
+        else:
+            callbacks.append(AnnealHparam(
+                hparams=model.hparams, key='lambda_weak', epoch_start=hparams['anneal_start'],
+                epoch_end=hparams['anneal_end']))
+            callbacks.append(UPS(
+                prob_threshold=hparams['prob_threshold'],
+                variance_threshold=hparams['variance_threshold'],
+                epoch_start=hparams['anneal_start']))
+
     if hparams.get('variational', False):
         from daart.callbacks import AnnealHparam
         callbacks.append(AnnealHparam(

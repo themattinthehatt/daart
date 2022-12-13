@@ -1,5 +1,6 @@
 h5py
 ipykernel
+jupyter
 matplotlib
 numpy
 opencv-python

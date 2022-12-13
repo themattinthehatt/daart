@@ -86,8 +86,7 @@ class BaseModel(nn.Module):
 
     @staticmethod
     def _build_mlp(
-            self, global_layer_num, in_size, hid_size, out_size, n_hid_layers=1,
-            activation='lrelu'):
+            global_layer_num, in_size, hid_size, out_size, n_hid_layers=1, activation='lrelu'):
 
         mlp = nn.Sequential()
 
@@ -199,7 +198,7 @@ class Segmenter(BaseModel):
             raise NotImplementedError("classifier type must be 'multiclass' or 'binary'")
         weight = hparams.get('class_weights', None)
         if weight is not None:
-            weight = torch.tensor(weight)
+            weight = torch.tensor(weight, dtype=torch.float32)
         self.class_loss = nn.CrossEntropyLoss(
             weight=weight, ignore_index=ignore_index, reduction='mean')
         self.pred_loss = nn.MSELoss(reduction='mean')
@@ -312,9 +311,10 @@ class Segmenter(BaseModel):
 
         # task regression: single linear layer
         if self.hparams.get('lambda_task', 0) > 0:
-            self.model['task_predictor'] = self._build_linear(
-                global_layer_num=global_layer_num, name='regression',
-                in_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'])
+            self.model['task_predictor'] = self._build_mlp(
+                global_layer_num=global_layer_num, in_size=self.hparams['n_hid_units'],
+                hid_size=self.hparams['n_hid_units'], out_size=self.hparams['task_size'],
+                n_hid_layers=1)
 
     def forward(self, x):
         """Process input data.
@@ -574,10 +574,15 @@ class Segmenter(BaseModel):
                 outputs_dict['labels_weak'], (-1, outputs_dict['labels_weak'].shape[-1]))
             # only compute loss where strong labels do not exist [indicated by a zero]
             if labels_strong is not None:
-                loss_weak = self.class_loss(
-                    labels_weak_reshape[labels_strong == 0], labels_weak[labels_strong == 0])
+                idxs_ = labels_strong == 0
+                if torch.sum(idxs_) > 0:
+                    loss_weak = self.class_loss(labels_weak_reshape[idxs_], labels_weak[idxs_])
+                else:
+                    # if all timepoints are labeled, set weak loss to zero
+                    loss_weak = torch.tensor([0.], device=labels_strong.device)
             else:
                 loss_weak = self.class_loss(labels_weak_reshape, labels_weak)
+
             loss += lambda_weak * loss_weak
             loss_weak_val = loss_weak.item()
             loss_dict['loss_weak'] = loss_weak_val

@@ -157,3 +157,62 @@ class PseudoLabels(BaseCallback):
         # update the data generator with the new psuedo-labels
         for dataset, labels in zip(data_generator.datasets, pseudo_labels):
             dataset.data['labels_weak'] = labels
+
+
+class UPS(BaseCallback):
+    """Implement uncertainty-aware pseudo-labels algorithm.
+
+    See details in: https://arxiv.org/pdf/2101.06329.pdf
+
+    """
+
+    def __init__(self, prob_threshold=0.95, variance_threshold=0.05, epoch_start=10):
+        self.prob_threshold = prob_threshold
+        self.variance_threshold = variance_threshold
+        self.epoch_start = epoch_start
+
+    def on_epoch_end(self, data_generator, model, trainer, **kwargs):
+
+        if trainer.curr_epoch < self.epoch_start:
+            return
+
+        # push training data through model 10 times to get a sense of variability in output
+        # probabilities; collect output probabilities
+        n_passes = 10
+        n_datasets = 0
+        outputs_list = []  # list (over passes) of lists (over datasets) of lists (over batches)
+        for n in range(n_passes):
+            # outputs_dict['labels']  # list of list of numpy arrays
+            outputs_dict = model.predict_labels(data_generator, remove_pad=False, mode='train')
+            outputs_list.append(outputs_dict['labels'])
+            n_datasets = len(outputs_dict['labels'])
+
+        # threshold the probabilities and the variances across passes to produce pseudo-labels
+        pseudo_labels = []
+        for dataset in range(n_datasets):
+            n_batches = len(outputs_list[0][dataset])
+            pseudo_labels_data = []
+            for batch in range(n_batches):
+                # compute medians and variances of probabilities across passes
+                # batch_data will be of shape (n_t, n_classes, n_passes)
+                batch_data = np.concatenate(
+                    [o[dataset][batch][:, :, None] for o in outputs_list], axis=2)
+                new_batch = np.zeros((batch_data.shape[0], batch_data.shape[1]))
+                if batch_data.shape[0] > 0:
+                    batch_medians = np.median(batch_data, axis=2)  # shape (n_t, n_classes)
+                    batch_vars = np.variance(batch_data, axis=2)  # shape (n_t, n_classes)
+                    # set all probabilities > threshold to 1
+                    new_batch[
+                        (batch_medians >= self.prob_threshold)
+                        & (batch_vars <= self.variance_threshold)
+                    ] = 1
+                    # update background class
+                    new_batch[np.sum(new_batch, axis=1) == 0, 0] = 1
+                    # turn into a one-hot vector
+                    new_batch = np.argmax(new_batch, axis=1)
+                pseudo_labels_data.append(new_batch.astype(np.int))
+            pseudo_labels.append(pseudo_labels_data)
+
+        # update the data generator with the new psuedo-labels
+        for dataset, labels in zip(data_generator.datasets, pseudo_labels):
+            dataset.data['labels_weak'] = labels
