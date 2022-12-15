@@ -49,7 +49,7 @@ tt_experiment_name: test
 rng_seed_model: 0
 
 # true to fit a variational version of the model where latent embeddings are sampled from gaussian
-variational: true
+variational: false
 
 
 # SEMI-SUPERVISION PARAMS
