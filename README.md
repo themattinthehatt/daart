@@ -1,5 +1,6 @@
 # daart: deep learning for animal action recognition toolbox
 
+[![Documentation Status](https://readthedocs.org/projects/daart/badge/?version=latest)](https://daart.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/334987729.svg)](https://zenodo.org/badge/latestdoi/334987729)
 
 A collection of tools for the discrete classification of animal behaviors using low-dimensional representations of videos (such as skeletons provided by tracking algorithms). Our approach combines strong supervision, weak supervision, and self-supervision to improve model performance. See the preprint [here](https://www.biorxiv.org/content/10.1101/2021.06.16.448685v1) for more details. This repo currently supports fitting the 
