@@ -6,12 +6,12 @@ numpy
 opencv-python
 pandas
 pytest
-pytorch==1.8.0
 pyyaml
 scikit-learn
 scipy>=1.2.0
 seaborn
 tables
 test-tube
+torch==1.8.0
 tqdm
 typeguard
