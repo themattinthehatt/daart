@@ -14,8 +14,11 @@ from daart import losses
 
 # to ignore imports for sphix-autoapidoc
 __all__ = [
-    'reparameterize_gaussian', 'get_activation_func_from_str', 'BaseModel', 'Segmenter',
-    'Ensembler'
+    'reparameterize_gaussian',
+    'get_activation_func_from_str',
+    'BaseModel',
+    'Segmenter',
+    'Ensembler',
 ]
 
 

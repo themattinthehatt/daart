@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['BaseCallback', 'EarlyStopping', 'AnnealHparam', 'PseudoLabels']
+__all__ = ['BaseCallback', 'EarlyStopping', 'AnnealHparam', 'PseudoLabels', 'UPS']
 
 
 class BaseCallback(object):

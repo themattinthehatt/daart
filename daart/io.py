@@ -9,6 +9,19 @@ from typeguard import typechecked
 import yaml
 
 
+__all__ = [
+    'get_subdirs',
+    'get_expt_dir',
+    'get_model_dir',
+    'get_model_params',
+    'find_experiment',
+    'read_expt_info_from_csv',
+    'export_expt_info_to_csv',
+    'export_hparams',
+    'make_dir_if_not_exists',
+]
+
+
 @typechecked
 def get_subdirs(path: str) -> List[str]:
     """Get all first-level subdirectories in a given path (no recursion).
@@ -364,5 +377,4 @@ def make_dir_if_not_exists(save_file: str) -> None:
 
     """
     save_dir = os.path.dirname(save_file)
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)

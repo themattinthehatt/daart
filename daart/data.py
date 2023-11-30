@@ -27,8 +27,16 @@ from typeguard import typechecked
 
 
 __all__ = [
-    'split_trials', 'compute_sequences', 'compute_sequence_pad', 'SingleDataset', 'DataGenerator',
-    'load_marker_csv', 'load_feature_csv', 'load_marker_h5', 'load_label_csv', 'load_label_pkl',
+    'split_trials',
+    'compute_sequences',
+    'compute_sequence_pad',
+    'SingleDataset',
+    'DataGenerator',
+    'load_marker_csv',
+    'load_feature_csv',
+    'load_marker_h5',
+    'load_label_csv',
+    'load_label_pkl',
 ]
 
 

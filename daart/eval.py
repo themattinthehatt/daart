@@ -13,7 +13,13 @@ from typing import List, Optional, Union
 from daart.io import make_dir_if_not_exists
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['get_precision_recall', 'int_over_union', 'run_lengths', 'plot_training_curves']
+__all__ = [
+    'get_precision_recall',
+    'int_over_union',
+    'run_lengths',
+    'plot_training_curves',
+    'load_metrics_csv_as_df',
+]
 
 
 @typechecked

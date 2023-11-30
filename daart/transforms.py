@@ -6,6 +6,17 @@ Data generator objects can apply these transforms to data upon loading.
 import numpy as np
 
 
+__all__ = [
+    'Compose',
+    'Transform',
+    'BlockShuffle',
+    'MakeOneHot',
+    'MotionEnergy',
+    'Unitize',
+    'ZScore'
+]
+
+
 class Compose(object):
     """Composes several transforms together.
 
