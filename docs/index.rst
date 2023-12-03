@@ -24,6 +24,7 @@ data:
    :caption: Contents:
 
    source/installation
+   source/user_guide
    source/api
 
 Indices and tables
