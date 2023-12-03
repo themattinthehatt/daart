@@ -3,11 +3,12 @@
 [![Documentation Status](https://readthedocs.org/projects/daart/badge/?version=latest)](https://daart.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/334987729.svg)](https://zenodo.org/badge/latestdoi/334987729)
 
-A collection of tools for the discrete classification of animal behaviors using low-dimensional representations of videos (such as skeletons provided by tracking algorithms). Our approach combines strong supervision, weak supervision, and self-supervision to improve model performance. See the preprint [here](https://www.biorxiv.org/content/10.1101/2021.06.16.448685v1) for more details. This repo currently supports fitting the 
-following types of base models on behavioral time series data:
+A collection of tools for the discrete classification of animal behaviors using low-dimensional representations of videos (such as skeletons provided by tracking algorithms). Our approach combines strong supervision, weak supervision, and self-supervision to improve model performance. See the preprint [here](https://www.biorxiv.org/content/10.1101/2021.06.16.448685v1) for more details. This repo currently supports fitting the following types of base models on behavioral time series data:
 * Dense MLP network with initial 1D convolutional layer
 * RNNs - both LSTMs and GRUs
 * Temporal Convolutional Networks (TCNs)
+
+See the [documentation](https://daart.readthedocs.io/) to get started!
 
 If you use daart in your analysis of behavioral data, please cite our preprint!
 
@@ -21,39 +22,7 @@ If you use daart in your analysis of behavioral data, please cite our preprint!
     
 ## Installation
 
-First you'll have to install the `git` package in order to access the code on github. Follow the 
-directions [here](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git) 
-for your specific OS.
-Then, in the command line, navigate to where you'd like to install the `daart` package and move 
-into that directory:
-```
-$: git clone https://github.com/themattinthehatt/daart
-$: cd daart
-```
 
-Next, follow the directions 
-[here](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) 
-to install the `conda` package for managing development environments.
-Then, create a conda environment:
-
-```
-$: conda create --name=daart python=3.6
-$: conda activate daart
-(daart) $: pip install -r requirements.txt 
-```
-
-To make the package modules visible to the python interpreter, locally run pip 
-install from inside the main `daart` directory:
-
-```
-(daart) $: pip install -e .
-```
-
-To be able to use this environment for jupyter notebooks:
-
-```
-(daart) $: python -m ipykernel install --user --name daart
-```
 
 ## Getting started
 

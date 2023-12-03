@@ -28,6 +28,7 @@ extensions = [
     'sphinx.ext.napoleon',  # parsing of different docstring styles
     'sphinx_automodapi.automodapi',
     'sphinx_copybutton',  # add copy button to code blocks
+    'sphinx_rtd_dark_mode',
 ]
 
 templates_path = ['_templates']
@@ -39,6 +40,9 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 html_theme = 'sphinx_rtd_theme'
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 html_static_path = ['_static']
+
+# user starts in dark mode
+default_dark_mode = True
 
 
 # document constructors

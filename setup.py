@@ -1,11 +1,31 @@
 from distutils.core import setup
 
 
-VERSION = '1.0.1'
+VERSION = '1.0.2'
 
 # add the README.md file to the long_description
 with open('README.md', 'r') as fh:
     long_description = fh.read()
+
+install_requires = [
+    'h5py',
+    'ipykernel',
+    'jupyter',
+    'matplotlib',
+    'numpy',
+    'opencv-python',
+    'pandas',
+    'pytest',
+    'pyyaml',
+    'scikit-learn',
+    'scipy>=1.2.0',
+    'seaborn',
+    'tables',
+    'test-tube',
+    'torch==1.8.0',
+    'tqdm',
+    'typeguard',
+]
 
 extras_require = {
     'dev': {
@@ -16,6 +36,7 @@ extras_require = {
         'sphinx-copybutton',
     }
 }
+
 setup(
     name='daart',
     packages=['daart'],
@@ -26,6 +47,7 @@ setup(
     author='matt whiteway',
     author_email='',
     url='http://www.github.com/themattinthehatt/daart',
+    install_requires=install_requires,
     extras_require=extras_require,
-    keywords=['machine learning', 'action segmentation', 'computer_vision'],
+    keywords=['machine learning', 'action segmentation', 'computer vision'],
 )
