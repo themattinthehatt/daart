@@ -266,6 +266,7 @@ class SingleDataset(data.Dataset):
 
         self.sequence_pad = sequence_pad
         self.sequence_length = sequence_length
+        self._data_len = -1  # update when loading first data type, check others against this
         self.load_data(sequence_length, input_type)
         self.n_sequences = len(self.data[signals[0]])
 
@@ -366,7 +367,7 @@ class SingleDataset(data.Dataset):
                     data_curr = np.load(self.paths[signal])
 
                 else:
-                    raise ValueError('"%s" is an invalid file extension' % file_ext)
+                    raise ValueError(f'"{file_ext}" is an invalid file extension')
 
                 self.dtypes[signal] = 'float32'
 
@@ -378,13 +379,14 @@ class SingleDataset(data.Dataset):
                     data_curr = vals
 
                 else:
-                    raise ValueError('"%s" is an invalid file extension' % file_ext)
+                    raise ValueError(f'"{file_ext}" is an invalid file extension')
 
                 self.dtypes[signal] = 'float32'
 
             elif signal == 'labels_strong':
 
                 if (self.paths[signal] is None) or not os.path.exists(self.paths[signal]):
+
                     # if no path given, assume same size as markers and set all to background
                     if 'markers' in self.data.keys():
                         data_curr = np.zeros(
@@ -392,9 +394,17 @@ class SingleDataset(data.Dataset):
                     else:
                         raise FileNotFoundError(
                             'Could not load "labels_strong" from None file without markers')
+
                 else:
-                    labels, label_names = load_label_csv(self.paths[signal])
-                    data_curr = np.argmax(labels, axis=1)
+
+                    file_ext = self.paths[signal].split('.')[-1]
+
+                    if file_ext == 'csv':
+                        labels, label_names = load_label_csv(self.paths[signal])
+                        data_curr = np.argmax(labels, axis=1)
+
+                    else:
+                        raise ValueError(f'"{file_ext}" is an invalid file extension')
 
                 self.dtypes[signal] = 'int32'
 
@@ -410,16 +420,29 @@ class SingleDataset(data.Dataset):
                     labels, label_names = load_label_pkl(self.paths[signal])
                     data_curr = labels
 
+                else:
+                    raise ValueError(f'"{file_ext}" is an invalid file extension')
+
                 self.dtypes[signal] = 'int32'
 
             else:
                 raise ValueError(
-                    '"{}" is an invalid signal type; must choose from {}'.format(
-                        signal, allowed_signals))
+                    f'"{signal}" is an invalid signal type; must choose from {allowed_signals}')
 
             # apply transforms to ALL data
             if self.transforms[signal]:
                 data_curr = self.transforms[signal](data_curr)
+
+            # check data length
+            data_len_curr = data_curr.shape[0]
+            if self._data_len == -1:
+                self._data_len = data_len_curr
+            else:
+                if data_len_curr != self._data_len:
+                    raise RuntimeError(
+                        f'{signal} data (t={data_len_curr}) is not same length as '
+                        f'{self.signals[0]} data (t={self._data_len}) for experiment {self.id}'
+                    )
 
             # compute batches of temporally contiguous data points
             data_curr = compute_sequences(data_curr, sequence_length, self.sequence_pad)

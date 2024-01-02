@@ -1,9 +1,10 @@
 import copy
 import numpy as np
+import os
 import pytest
 import torch
 
-from daart.data import split_trials, compute_sequences
+from daart.data import split_trials, compute_sequences, compute_sequence_pad, DataGenerator
 from daart.utils import build_data_generator
 
 
@@ -67,7 +68,7 @@ def test_compute_sequences():
     assert np.all(batch_data[0] == data[:B, :])
 
 
-def test_single_dataset(hparams, data_generator):
+def test_single_dataset(data_generator):
 
     dataset = data_generator.datasets[0]
 
@@ -91,6 +92,74 @@ def test_single_dataset(hparams, data_generator):
 
     # make sure batches are on the right device
     assert batch['markers'].device == torch.device('cpu')
+
+
+def test_single_dataset_loading_errors(hparams):
+    """Make sure that an error is thrown if data types are of different lengths."""
+
+    params = copy.deepcopy(hparams)
+
+    # -----------------------------
+    # mismatched data length
+    # -----------------------------
+    signals = []
+    transforms = []
+    paths = []
+
+    expt_id_0 = params['expt_ids'][0]
+    expt_id_1 = params['expt_ids'][1]
+
+    # DLC markers or features (i.e. from simba)
+    input_type = params.get('input_type', 'markers')
+    markers_file = os.path.join(params['data_dir'], input_type, expt_id_0 + '_labeled.h5')
+    signals.append('markers')
+    transforms.append(None)
+    paths.append(markers_file)
+
+    # hand labels
+    hand_labels_file = os.path.join(params['data_dir'], 'labels-hand', expt_id_1 + '_labels.csv')
+    signals.append('labels_strong')
+    transforms.append(None)
+    paths.append(hand_labels_file)
+
+    # compute padding needed to account for convolutions
+    params['sequence_pad'] = compute_sequence_pad(params)
+
+    # build data generator
+    with pytest.raises(RuntimeError):
+        DataGenerator(
+            [expt_id_0], [signals], [transforms], [paths], device=params['device'],
+            sequence_length=params['sequence_length'], sequence_pad=params['sequence_pad'],
+            batch_size=params['batch_size'],
+            trial_splits=params['trial_splits'], train_frac=params['train_frac'],
+            input_type=params.get('input_type', 'markers'))
+
+    # -----------------------------
+    # invalid signal type
+    # -----------------------------
+    signals_tmp = copy.copy(signals)
+    signals_tmp[0] = 'invalid_signal_type'
+    with pytest.raises(ValueError):
+        DataGenerator(
+            [expt_id_0], [signals_tmp], [transforms], [paths], device=params['device'],
+            sequence_length=params['sequence_length'], sequence_pad=params['sequence_pad'],
+            batch_size=params['batch_size'],
+            trial_splits=params['trial_splits'], train_frac=params['train_frac'],
+            input_type=params.get('input_type', 'markers'))
+
+    # -----------------------------
+    # invalid file extensions
+    # -----------------------------
+    # markers
+    paths_tmp = copy.copy(paths)
+    paths_tmp[0] = paths_tmp[0].replace('.h5', '.bad')
+    with pytest.raises(ValueError):
+        DataGenerator(
+            [expt_id_0], [signals], [transforms], [paths_tmp], device=params['device'],
+            sequence_length=params['sequence_length'], sequence_pad=params['sequence_pad'],
+            batch_size=params['batch_size'],
+            trial_splits=params['trial_splits'], train_frac=params['train_frac'],
+            input_type=params.get('input_type', 'markers'))
 
 
 def test_data_generator(hparams, data_generator):
