@@ -148,7 +148,7 @@ def default_config_vals(data_dir) -> dict:
         'train': {
             'min_epochs': 1,
             'max_epochs': 1,
-            'sequence_length': 20,
+            'sequence_length': 50,
             'train_frac': 0.01,
             'enable_early_stop': False,
             'plot_train_curves': False,
@@ -205,6 +205,7 @@ def update_config_files() -> Callable:
 def fit_model(model_fitting_file) -> Callable:
 
     def _fit_model_func(config_files):
+
         call_str = [
             'python',
             model_fitting_file,
@@ -212,8 +213,9 @@ def fit_model(model_fitting_file) -> Callable:
             '--model_config', config_files['model'],
             '--train_config', config_files['train'],
         ]
-        code = subprocess.call(' '.join(call_str), shell=True)
-        if code != 0:
+        exitcode = subprocess.call(' '.join(call_str), shell=True)
+
+        if exitcode != 0:
             raise Exception('test-tube model fitting failed')
 
     return _fit_model_func

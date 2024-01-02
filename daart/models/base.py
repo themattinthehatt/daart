@@ -434,8 +434,7 @@ class Segmenter(BaseModel):
         elif mode == 'train':
             self.train()
         else:
-            raise NotImplementedError(
-                'must choose mode="eval" or mode="train", not mode="%s"' % mode)
+            raise NotImplementedError(f'select mode="eval" or mode="train", not mode="{mode}"')
 
         pad = self.hparams.get('sequence_pad', 0)
 

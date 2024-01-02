@@ -17,31 +17,41 @@ from daart.utils import build_data_generator
 
 def run_main(hparams, *args):
 
-    if not isinstance(hparams, dict):
-        hparams = vars(hparams)
+    # set return value
+    ret_val = None
 
-    # start at random times (so test tube creates separate folders)
-    t = time.time()
-    np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
-    time.sleep(np.random.uniform(2))
+    try:
 
-    # create test-tube experiment
-    hparams['expt_ids'] = hparams['expt_ids'].split(';')
-    hparams, exp = create_tt_experiment(hparams)
-    if hparams is None:
-        print('Experiment exists! Aborting fit')
-        return
+        if not isinstance(hparams, dict):
+            hparams = vars(hparams)
 
-    # set up error logging (different from train logging)
-    logging.basicConfig(
-        filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
-        filemode='w', level=logging.DEBUG,
-        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
-    )
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
+        # start at random times (so test tube creates separate folders)
+        t = time.time()
+        np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
+        time.sleep(np.random.uniform(2))
 
-    # run train model script
-    train_model(hparams)
+        # create test-tube experiment
+        hparams['expt_ids'] = hparams['expt_ids'].split(';')
+        hparams, exp = create_tt_experiment(hparams)
+        if hparams is None:
+            print('Experiment exists! Aborting fit')
+            return
+
+        # set up error logging (different from train logging)
+        logging.basicConfig(
+            filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
+            filemode='w', level=logging.DEBUG,
+            format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
+        )
+        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
+
+        # run train model script
+        train_model(hparams)
+
+    except Exception as e:
+        ret_val = e
+
+    return ret_val
 
 
 def train_model(hparams):
@@ -120,15 +130,29 @@ def train_model(hparams):
     # save training curves
     if hparams.get('plot_train_curves', False):
         plot_training_curves(
-            os.path.join(hparams['tt_version_dir'], 'metrics.csv'), dtype='train',
+            metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
+            dtype='train',
             expt_ids=hparams['expt_ids'],
             save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
-            format='png')
+            format='png',
+        )
         plot_training_curves(
-            os.path.join(hparams['tt_version_dir'], 'metrics.csv'), dtype='val',
+            metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
+            dtype='val',
             expt_ids=hparams['expt_ids'],
             save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
-            format='png')
+            format='png',
+        )
+
+    # run model inference on all training sessions
+    if hparams['train_frac'] != 1.0:  # rebuild data generator to include all data if necessary
+        hparams['train_frac'] = 1.0
+        data_gen = build_data_generator(hparams)
+    results_dict = model.predict_labels(data_gen)
+    for sess, dataset in enumerate(data_gen.datasets):
+        expt_id = dataset.id
+        labels = np.vstack(results_dict['labels'][sess])
+        np.save(os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy'), labels)
 
     # get rid of unneeded logging info
     clean_tt_dir(hparams)
@@ -143,8 +167,8 @@ if __name__ == '__main__':
 
     For example yaml files, see the `configs` subdirectory inside the daart home directory
 
-    NOTE: this script assumes a specific naming convention for markers and labels (see L54-L65). 
-    You'll need to update these lines to be consistent with your own naming conventions.
+    NOTE: this script assumes a specific naming convention for markers and labels 
+    (see daart.readthedocs.io). 
     
     """
 
@@ -155,12 +179,18 @@ if __name__ == '__main__':
             gpu_ids = [str(hyperparams.gpus_vis)]
         else:
             gpu_ids = hyperparams.gpus_vis.split(';')
-        hyperparams.optimize_parallel_gpu(
+        results = hyperparams.optimize_parallel_gpu(
             run_main,
             gpu_ids=gpu_ids)
 
     elif hyperparams.device == 'cpu':
-        hyperparams.optimize_parallel_cpu(
+        results = hyperparams.optimize_parallel_cpu(
             run_main,
             nb_trials=hyperparams.tt_n_cpu_trials,
             nb_workers=hyperparams.tt_n_cpu_workers)
+
+    exitcode = 0
+    for result in results:
+        if result[1] is not None:
+            exitcode = 1
+    exit(exitcode)

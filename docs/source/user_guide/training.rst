@@ -29,3 +29,31 @@ is stored and run the following from the terminal:
 
 You will see configuration details printed in the terminal, followed by a training progress bar.
 Upon training completion the model will be saved in the location specified in the data config.
+
+
+Model directory structure
+-------------------------
+
+If you train a model using ``fit_models.py``, a directory will be created with the following
+structure:
+
+.. code-block::
+
+    /results_dir/expt_dir/backbone/tt_expt_name/version_0
+      ├── <sess_id_0>_states.npy
+      |   ...
+      ├── <sess_id_n>_states.npy
+      ├── best_val_model.pt
+      ├── console.log
+      ├── hparams.yaml
+      ├── metrics.csv
+      ├── train_curves.png
+      └── val_curves.png
+
+* ``<sess_id_x>_states.npy``: predicted probabilities for each state at each time point; there is one file for each training session
+* ``best_val_model.pt``: model weights
+* ``console.log``: log file that contains a copy of the terminal printouts during training
+* ``hparams.yaml``: copy of parameters from all configuration files used for model training
+* ``metrics.csv``: various metrics computed on training and validation data throughout training
+* ``train_curves.png``: graphical representation of info in ``metrics.csv`` (training data)
+* ``val_curves.png``: graphical representation of info in ``metrics.csv`` (validation data)
