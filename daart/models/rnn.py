@@ -1,6 +1,5 @@
-import numpy as np
-from sklearn.metrics import accuracy_score
-import torch
+"""RNN models (LSTM/GRU) implemented in PyTorch."""
+
 from torch import nn
 from daart.models.base import BaseModel
 

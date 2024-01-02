@@ -13,7 +13,6 @@ of trials, which are split into training, validation, and testing trials using t
 """
 
 from collections import OrderedDict
-import h5py
 import logging
 import numpy as np
 import os
@@ -22,7 +21,7 @@ import pickle
 import torch
 from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
-from typing import List, Optional, Union
+from typing import List, Union
 from typeguard import typechecked
 
 
@@ -561,8 +560,8 @@ class DataGenerator(object):
                             n_idxs = int(np.floor(train_frac * n_batches))
                             if n_idxs <= 0:
                                 print_str = (
-                                    f'warning: attempting to use invalid number of training '
-                                    f'batches; defaulting to all training batches'
+                                    'warning: attempting to use invalid number of training '
+                                    'batches; defaulting to all training batches'
                                 )
                                 logging.info(print_str)
                                 n_idxs = n_batches

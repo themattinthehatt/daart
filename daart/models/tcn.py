@@ -1,8 +1,5 @@
 """Temporal Convolution model implemented in PyTorch."""
 
-import numpy as np
-from sklearn.metrics import accuracy_score
-import torch
 from torch import nn
 from daart.models.base import BaseModel, get_activation_func_from_str
 

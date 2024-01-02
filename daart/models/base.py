@@ -1,9 +1,6 @@
 """Base models/modules in PyTorch."""
 
-import math
 import numpy as np
-import os
-import pickle
 from scipy.special import softmax as scipy_softmax
 from scipy.stats import entropy
 import torch
@@ -220,8 +217,8 @@ class Segmenter(BaseModel):
 
         if self.hparams.get('variational', False):
             format_str += 'Variational Layers:\n'
-            for l in ['latent_mean', 'latent_logvar']:
-                for i, module in enumerate(self.model[l]):
+            for latent in ['latent_mean', 'latent_logvar']:
+                for i, module in enumerate(self.model[latent]):
                     format_str += str('    {}: {}\n'.format(i, module))
             format_str += '\n'
 
@@ -708,7 +705,7 @@ class Ensembler(object):
             for batch, labels_batch in enumerate(labels_sess):
 
                 # labels_curr is of shape (n_models, sequence_len, n_classes)
-                labels_curr = np.vstack([l[sess][batch][None, ...] for l in labels_all])
+                labels_curr = np.vstack([lab[sess][batch][None, ...] for lab in labels_all])
 
                 # combine predictions across models
                 if weights is None:

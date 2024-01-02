@@ -1,6 +1,5 @@
 import copy
 import numpy as np
-import pytest
 import torch
 
 from daart.models import Segmenter, Ensembler

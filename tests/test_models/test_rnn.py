@@ -1,5 +1,4 @@
 import copy
-import pytest
 import torch
 
 from daart.models import Segmenter
@@ -146,7 +145,9 @@ def test_gru_variational(hparams, data_generator, check_batch):
     assert 'loss' in loss_dict
 
 
-def test_lstm_testtube(tmp_path, default_config_vals, config_files, update_config_files, fit_model):
+def test_lstm_testtube(
+        tmp_path, default_config_vals, config_files, update_config_files, fit_model
+):
 
     tmp_path = str(tmp_path)
     new_vals = default_config_vals.copy()

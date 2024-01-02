@@ -3,7 +3,6 @@
 import itertools
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 import pandas as pd
 import seaborn as sns
 from sklearn.metrics import recall_score, precision_score

@@ -1,5 +1,4 @@
 import copy
-import pytest
 import torch
 
 from daart.models import Segmenter

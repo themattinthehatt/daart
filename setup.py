@@ -8,7 +8,6 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 install_requires = [
-    'h5py',
     'ipykernel',
     'jupyter',
     'matplotlib',
@@ -29,6 +28,7 @@ install_requires = [
 
 extras_require = {
     'dev': {
+        'flake8',
         'sphinx',
         'sphinx_rtd_theme',
         'sphinx-rtd-dark-mode',

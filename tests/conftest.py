@@ -6,10 +6,9 @@ These fixtures create data and data modules that can be reused by other tests.
 
 import os
 import pytest
-import shutil
 import subprocess
 import torch
-from typing import Callable, List, Optional
+from typing import Callable
 import yaml
 
 from daart.data import DataGenerator

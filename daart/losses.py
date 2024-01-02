@@ -1,6 +1,5 @@
 """Custom losses for PyTorch models."""
 
-import numpy as np
 import torch
 from typeguard import typechecked
 
