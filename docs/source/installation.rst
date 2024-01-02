@@ -68,7 +68,7 @@ Active the new environment:
 
        pytest
 
-   The tests will take a minute or two to run.
+   The tests will take a few minutes to run. You should not see any fails; warnings are ok.
 
 4. To be able to use this environment for jupyter notebooks:
 
