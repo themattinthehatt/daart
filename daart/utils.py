@@ -24,15 +24,24 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         transforms_curr = []
         paths_curr = []
 
-        # DLC markers or features (i.e. from simba)
+        # DLC markers or features (e.g. from simba)
         input_type = hparams.get('input_type', 'markers')
-        markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.h5')
-        if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.csv')
-        if not os.path.exists(markers_file):
-            markers_file = os.path.join(hparams['data_dir'], input_type, expt_id + '_labeled.npy')
-        if not os.path.exists(markers_file):
-            msg = 'could not find marker file for %s at %s' % (expt_id, markers_file)
+        base_dir = os.path.join(hparams['data_dir'], input_type)
+        possible_markers_files = [
+            os.path.join(base_dir, expt_id + '_labeled.h5'),
+            os.path.join(base_dir, expt_id + '_labeled.csv'),
+            os.path.join(base_dir, expt_id + '_labeled.npy'),
+            os.path.join(base_dir, expt_id + '.h5'),
+            os.path.join(base_dir, expt_id + '.csv'),
+            os.path.join(base_dir, expt_id + '.npy'),
+        ]
+        markers_file = None
+        for marker_file_ in possible_markers_files:
+            if os.path.exists(marker_file_):
+                markers_file = marker_file_
+                break
+        if markers_file is None:
+            msg = f'did not find marker file for {expt_id} in {base_dir}'
             logging.info(msg)
             raise FileNotFoundError(msg)
         signals_curr.append('markers')
@@ -44,19 +53,36 @@ def build_data_generator(hparams: dict) -> DataGenerator:
             if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
                 hand_labels_file = None
             else:
-                hand_labels_file = os.path.join(
-                    hparams['data_dir'], 'labels-hand', expt_id + '_labels.csv')
-                if not os.path.exists(hand_labels_file):
-                    logging.warning('did not find hand labels file for %s' % expt_id)
-                    hand_labels_file = None
+                base_dir = os.path.join(hparams['data_dir'], 'labels-hand')
+                possible_hand_labels_files = [
+                    os.path.join(base_dir, expt_id + '_labels.csv'),
+                    os.path.join(base_dir, expt_id + '.csv'),
+                ]
+                hand_labels_file = None
+                for hand_labels_file_ in possible_hand_labels_files:
+                    if os.path.exists(hand_labels_file_):
+                        hand_labels_file = hand_labels_file_
+                        break
+                if hand_labels_file is None:
+                    logging.warning(f'did not find hand labels file for {expt_id} in {base_dir}')
             signals_curr.append('labels_strong')
             transforms_curr.append(None)
             paths_curr.append(hand_labels_file)
 
         # heuristic labels
         if hparams.get('lambda_weak', 0) > 0:
-            heur_labels_file = os.path.join(
-                hparams['data_dir'], 'labels-heuristic', expt_id + '_labels.csv')
+            base_dir = os.path.join(hparams['data_dir'], 'labels-heuristic')
+            possible_heur_labels_files = [
+                os.path.join(base_dir, expt_id + '_labels.csv'),
+                os.path.join(base_dir, expt_id + '.csv'),
+            ]
+            heur_labels_file = None
+            for heur_labels_file_ in possible_heur_labels_files:
+                if os.path.exists(heur_labels_file_):
+                    heur_labels_file = heur_labels_file_
+                    break
+            if heur_labels_file is None:
+                logging.warning(f'did not find heuristic labels file for {expt_id} in {base_dir}')
             signals_curr.append('labels_weak')
             transforms_curr.append(None)
             paths_curr.append(heur_labels_file)

@@ -111,13 +111,13 @@ def test_single_dataset_loading_errors(hparams):
 
     # DLC markers or features (i.e. from simba)
     input_type = params.get('input_type', 'markers')
-    markers_file = os.path.join(params['data_dir'], input_type, expt_id_0 + '_labeled.h5')
+    markers_file = os.path.join(params['data_dir'], input_type, expt_id_0 + '.h5')
     signals.append('markers')
     transforms.append(None)
     paths.append(markers_file)
 
     # hand labels
-    hand_labels_file = os.path.join(params['data_dir'], 'labels-hand', expt_id_1 + '_labels.csv')
+    hand_labels_file = os.path.join(params['data_dir'], 'labels-hand', expt_id_1 + '.csv')
     signals.append('labels_strong')
     transforms.append(None)
     paths.append(hand_labels_file)

@@ -47,20 +47,20 @@ Videos are not required for fitting the daart models, but may be useful for down
 
     data_directory
     ├── features-base
-    │   ├── <sess_id_0>_labeled.csv
-    │   └── <sess_id_1>_labeled.csv
+    │   ├── <sess_id_0>.csv
+    │   └── <sess_id_1>.csv
     ├── features-simba
-    │   ├── <sess_id_0>_labeled.csv
-    │   └── <sess_id_1>_labeled.csv
+    │   ├── <sess_id_0>.csv
+    │   └── <sess_id_1>.csv
     ├── labels-hand
-    │   ├── <sess_id_0>_labels.csv
-    │   └── <sess_id_1>_labels.csv
+    │   ├── <sess_id_0>.csv
+    │   └── <sess_id_1>.csv
     ├── labels-heuristic
-    │   ├── <sess_id_0>_labels.csv
-    │   └── <sess_id_1>_labels.csv
+    │   ├── <sess_id_0>.csv
+    │   └── <sess_id_1>.csv
     ├── markers
-    │   ├── <sess_id_0>_labeled.csv
-    │   └── <sess_id_1>_labeled.csv
+    │   ├── <sess_id_0>.csv
+    │   └── <sess_id_1>.csv
     └── videos
         ├── <sess_id_0>.mp4
         └── <sess_id_1>.mp4
@@ -77,7 +77,7 @@ Markers format
 The current code accepts either csv or h5 files that are output by DLC or Lightning Pose.
 The csv files must look like the following:
 
-.. list-table:: markers/<sess_id>_labeled.csv
+.. list-table:: markers/<sess_id>.csv
    :widths: 25 25 25 25 25 25 25
    :header-rows: 3
 
@@ -137,7 +137,7 @@ Features format
 Features should also be stored in csv files, with a single header row giving the feature name for
 each column. The first column denotes the frame number.
 
-.. list-table:: features/<sess_id>_labeled.csv
+.. list-table:: features/<sess_id>.csv
    :widths: 10 25 25 25
    :header-rows: 1
 
@@ -176,7 +176,7 @@ The remaining columns correspond to the dataset-specific behavioral classes, and
 (0s and 1s).
 There should only be a single "1" per row.
 
-.. list-table:: labels-hand/<sess_id>_labels.csv
+.. list-table:: labels-hand/<sess_id>.csv
    :widths: 10 25 25 25 25
    :header-rows: 1
 
