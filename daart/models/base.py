@@ -709,7 +709,7 @@ class Ensembler(object):
             for batch, labels_batch in enumerate(labels_sess):
 
                 # labels_curr is of shape (n_models, sequence_len, n_classes)
-                labels_curr = np.vstack(l[sess][batch][None, ...] for l in labels_all)
+                labels_curr = np.vstack([l[sess][batch][None, ...] for l in labels_all])
 
                 # combine predictions across models
                 if weights is None:

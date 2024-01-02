@@ -41,10 +41,7 @@ def run_main(hparams, *args):
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
 
     # run train model script
-    try:
-        train_model(hparams)
-    except:
-        logging.exception('error traceback')
+    train_model(hparams)
 
 
 def train_model(hparams):

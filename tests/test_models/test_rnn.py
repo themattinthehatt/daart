@@ -144,3 +144,35 @@ def test_gru_variational(hparams, data_generator, check_batch):
 
     loss_dict = model.training_step(batch_ext, accumulate_grad=False)
     assert 'loss' in loss_dict
+
+
+def test_lstm_testtube(tmp_path, default_config_vals, config_files, update_config_files, fit_model):
+
+    tmp_path = str(tmp_path)
+    new_vals = default_config_vals.copy()
+
+    # define new config values
+    new_vals['data']['results_dir'] = tmp_path
+    new_vals['model']['backbone'] = 'lstm'
+
+    # update config files, save in tmp_path
+    config_dicts, new_config_files = update_config_files(config_files, new_vals, tmp_path)
+
+    # fit model
+    fit_model(new_config_files)
+
+
+def test_gru_testtube(tmp_path, default_config_vals, config_files, update_config_files, fit_model):
+
+    tmp_path = str(tmp_path)
+    new_vals = default_config_vals.copy()
+
+    # define new config values
+    new_vals['data']['results_dir'] = tmp_path
+    new_vals['model']['backbone'] = 'gru'
+
+    # update config files, save in tmp_path
+    config_dicts, new_config_files = update_config_files(config_files, new_vals, tmp_path)
+
+    # fit model
+    fit_model(new_config_files)
