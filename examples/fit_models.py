@@ -40,7 +40,7 @@ def run_main(hparams, *args):
         # set up error logging (different from train logging)
         logging.basicConfig(
             filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
-            filemode='w', level=logging.DEBUG,
+            filemode='w', level=logging.INFO,
             format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
         )
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console

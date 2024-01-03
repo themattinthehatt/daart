@@ -20,7 +20,7 @@ def get_all_params():
         raise ValueError('No command line arguments allowed other than config file names')
 
     def add_to_parser(parser, arg_name, value):
-        if arg_name == 'expt_ids' or arg_name == 'expt_ids_to_keep':
+        if arg_name == 'expt_ids' or arg_name == 'expt_ids_test' or arg_name == 'expt_ids_to_keep':
             # treat expt_ids differently, want to parse full lists as one
             if isinstance(value, list):
                 value = ';'.join(value)
@@ -109,5 +109,6 @@ def clean_tt_dir(hparams):
     version_dir = hparams['tt_version_dir']
     subdirs = get_subdirs(version_dir)
     for subdir in subdirs:
-        shutil.rmtree(os.path.join(version_dir, subdir))
+        if subdir in ['media', 'tf']:
+            shutil.rmtree(os.path.join(version_dir, subdir))
     os.remove(os.path.join(version_dir, 'meta.experiment'))
