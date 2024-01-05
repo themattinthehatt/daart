@@ -9,6 +9,9 @@ expt_ids:
     - 2019_06_26_fly2
     - 2019_08_07_fly2
 
+# set to -100 if every single frame is scored; see docs for more info
+ignore_class: 0
+
 # base data directory
 data_dir: /path/to/data
 

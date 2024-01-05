@@ -263,6 +263,9 @@ class SingleDataset(data.Dataset):
             self.paths[signal] = path
             self.dtypes[signal] = None  # update when loading data
 
+        self.feature_names = None  # update when loading markers/features
+        self.label_names = None  # update when loading hand labels
+
         self.sequence_pad = sequence_pad
         self.sequence_length = sequence_length
         self._data_len = -1  # update when loading first data type, check others against this
@@ -349,7 +352,7 @@ class SingleDataset(data.Dataset):
 
                 if file_ext == 'csv':
                     if input_type == 'markers':
-                        xs, ys, ls, marker_names = load_marker_csv(self.paths[signal])
+                        xs, ys, ls, feature_names = load_marker_csv(self.paths[signal])
                         data_curr = np.hstack([xs, ys])
                     else:
                         vals, feature_names = load_feature_csv(self.paths[signal])
@@ -358,16 +361,18 @@ class SingleDataset(data.Dataset):
                 elif file_ext == 'h5':
                     if input_type != 'markers':
                         raise NotImplementedError
-                    xs, ys, ls, marker_names = load_marker_h5(self.paths[signal])
+                    xs, ys, ls, feature_names = load_marker_h5(self.paths[signal])
                     data_curr = np.hstack([xs, ys])
 
                 elif file_ext == 'npy':
                     # assume single array
                     data_curr = np.load(self.paths[signal])
+                    feature_names = None
 
                 else:
                     raise ValueError(f'"{file_ext}" is an invalid file extension')
 
+                self.feature_names = feature_names
                 self.dtypes[signal] = 'float32'
 
             elif signal == 'tasks':
@@ -383,6 +388,8 @@ class SingleDataset(data.Dataset):
                 self.dtypes[signal] = 'float32'
 
             elif signal == 'labels_strong':
+
+                label_names = None
 
                 if (self.paths[signal] is None) or not os.path.exists(self.paths[signal]):
 
@@ -405,6 +412,7 @@ class SingleDataset(data.Dataset):
                     else:
                         raise ValueError(f'"{file_ext}" is an invalid file extension')
 
+                self.label_names = label_names
                 self.dtypes[signal] = 'int32'
 
             elif signal == 'labels_weak':
@@ -536,6 +544,8 @@ class DataGenerator(object):
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
+        self.feature_names = self.datasets[0].feature_names
+        self.label_names = self.datasets[0].label_names
 
         # get train/val/test batch indices for each dataset
         if trial_splits is None:
@@ -616,6 +626,25 @@ class DataGenerator(object):
     @typechecked
     def __len__(self) -> int:
         return self.n_datasets
+
+    @typechecked
+    def count_class_examples(self) -> np.array:
+
+        assert 'labels_strong' in self.signals[0], 'Cannot count examples without hand labels'
+
+        totals = np.zeros(len(self.label_names), dtype=np.int)
+        for dataset in self.datasets:
+            pad = dataset.sequence_pad
+            for b, batch in enumerate(dataset.data['labels_strong']):
+                # log number of examples for batch
+                counts = np.bincount(batch[pad:-pad].astype('int'))
+                if len(counts) == len(totals):
+                    totals += counts
+                else:
+                    for i, c in enumerate(counts):
+                        totals[i] += c
+
+        return totals
 
     @typechecked
     def reset_iterators(self, dtype: str) -> None:

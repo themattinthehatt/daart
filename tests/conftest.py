@@ -212,7 +212,9 @@ def fit_model(model_fitting_file) -> Callable:
             '--model_config', config_files['model'],
             '--train_config', config_files['train'],
         ]
-        exitcode = subprocess.call(' '.join(call_str), shell=True)
+        call_str = ' '.join(call_str)
+        print(call_str)
+        exitcode = subprocess.call(call_str, shell=True)
 
         if exitcode != 0:
             raise Exception('test-tube model fitting failed')

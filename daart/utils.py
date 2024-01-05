@@ -8,7 +8,7 @@ from daart.transforms import ZScore
 
 
 # to ignore imports for sphix-autoapidoc
-__all__ = ['build_data_generator']
+__all__ = ['build_data_generator', 'collect_callbacks']
 
 
 def build_data_generator(hparams: dict) -> DataGenerator:
@@ -104,11 +104,15 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
     # build data generator
     data_gen = DataGenerator(
-        hparams['expt_ids'], signals, transforms, paths, device=hparams['device'],
-        sequence_length=hparams['sequence_length'], sequence_pad=hparams['sequence_pad'],
+        hparams['expt_ids'], signals, transforms, paths,
+        device=hparams['device'],
+        sequence_length=hparams['sequence_length'],
+        sequence_pad=hparams['sequence_pad'],
         batch_size=hparams['batch_size'],
-        trial_splits=hparams['trial_splits'], train_frac=hparams['train_frac'],
-        input_type=hparams.get('input_type', 'markers'))
+        trial_splits=hparams['trial_splits'],
+        train_frac=hparams['train_frac'],
+        input_type=hparams.get('input_type', 'markers'),
+    )
 
     # automatically compute input/output sizes from data
     input_size = 0
@@ -131,3 +135,58 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         hparams['task_size'] = task_size
 
     return data_gen
+
+
+def collect_callbacks(hparams: dict) -> list:
+    """Helper function to build a list of callbacks from hparam dict."""
+
+    callbacks = []
+    if hparams['enable_early_stop']:
+        from daart.callbacks import EarlyStopping
+        # Note that patience does not account for val check interval values greater than 1;
+        # for example, if val_check_interval=5 and patience=20, then the model will train
+        # for at least 5 * 20 = 100 epochs before training can terminate
+        callbacks.append(EarlyStopping(patience=hparams['early_stop_history']))
+
+    if hparams.get('semi_supervised_algo', 'none') == 'pseudo_labels':
+        from daart.callbacks import AnnealHparam, PseudoLabels
+        if hparams['lambda_weak'] == 0:
+            print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
+        else:
+            callbacks.append(AnnealHparam(
+                hparams=hparams,
+                key='lambda_weak',
+                epoch_start=hparams['anneal_start'],
+                epoch_end=hparams['anneal_end'],
+            ))
+            callbacks.append(PseudoLabels(
+                prob_threshold=hparams['prob_threshold'],
+                epoch_start=hparams['anneal_start'],
+            ))
+    elif hparams.get('semi_supervised_algo', 'none') == 'ups':
+        from daart.callbacks import AnnealHparam, UPS
+        if hparams['lambda_weak'] == 0:
+            print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
+        else:
+            callbacks.append(AnnealHparam(
+                hparams=hparams,
+                key='lambda_weak',
+                epoch_start=hparams['anneal_start'],
+                epoch_end=hparams['anneal_end'],
+            ))
+            callbacks.append(UPS(
+                prob_threshold=hparams['prob_threshold'],
+                variance_threshold=hparams['variance_threshold'],
+                epoch_start=hparams['anneal_start'],
+            ))
+
+    if hparams.get('variational', False):
+        from daart.callbacks import AnnealHparam
+        callbacks.append(AnnealHparam(
+            hparams=hparams,
+            key='kl_weight',
+            epoch_start=0,
+            epoch_end=100,
+        ))
+
+    return callbacks

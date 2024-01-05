@@ -189,6 +189,10 @@ def test_data_generator(hparams, data_generator):
     # make sure batches are on the right device
     assert batch['markers'].device == torch.device('cpu')
 
+    # make sure we count the correct number of hand labels (hard-coded)
+    n_exs = data_generator.count_class_examples()
+    assert np.all(n_exs == np.array([91453, 600, 600, 450, 600, 1297]))
+
 
 def test_data_generator_loading(hparams):
 
@@ -206,6 +210,8 @@ def test_data_generator_loading(hparams):
     assert 'labels_strong' not in dtypes
     assert 'labels_weak' not in dtypes
     assert 'tasks' not in dtypes
+    with pytest.raises(AssertionError):
+        data_gen.count_class_examples()
 
     # load markers + strong labels
     hp['lambda_strong'] = 1
@@ -218,6 +224,8 @@ def test_data_generator_loading(hparams):
     assert 'labels_strong' in dtypes
     assert 'labels_weak' not in dtypes
     assert 'tasks' not in dtypes
+    n_exs = data_gen.count_class_examples()
+    assert np.all(n_exs == np.array([43044, 300, 300, 350, 300, 706]))
 
     # load markers + weak labels
     hp['lambda_strong'] = 0
@@ -230,5 +238,7 @@ def test_data_generator_loading(hparams):
     assert 'labels_strong' not in dtypes
     assert 'labels_weak' in dtypes
     assert 'tasks' not in dtypes
+    with pytest.raises(AssertionError):
+        data_gen.count_class_examples()
 
     # TODO: tasks; need to upload task data to repo
