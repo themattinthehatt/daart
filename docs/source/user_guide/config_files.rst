@@ -28,8 +28,9 @@ Data
 ====
 
 * **input_type**: name of directory containing input data: 'markers' | 'features' | ...
-* **output_size**: number of classes (including background)
 * **expt_ids**: list of experiment ids used for training the model
+* **ignore_class**: specifies index of the column in hand/heuristic label files that should be ignored when computing the loss function. 1s in this column mean "this frame has not been scored"; if every frame has been scored, set this to a negative value like -100.
+* **weight_classes**: false to weight each class equally in loss function; true to weight each class inversely proportional to its frequency
 * **data_dir**: absolute path to directory that contains the data
 * **results_dir**: absolute path to directory that stores model fitting results
 

@@ -1,9 +1,6 @@
 # name of directory containing input data: 'markers' | 'features' | ...
 input_type: markers
 
-# number of classes (including background)
-output_size: 6
-
 # experiment ids
 expt_ids:
     - 2019_06_26_fly2
@@ -11,6 +8,9 @@ expt_ids:
 
 # set to -100 if every single frame is scored; see docs for more info
 ignore_class: 0
+
+# true to weight each class inversely proportional to its frequency in loss function
+weight_classes: false
 
 # base data directory
 data_dir: /path/to/data

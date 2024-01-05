@@ -263,8 +263,9 @@ class SingleDataset(data.Dataset):
             self.paths[signal] = path
             self.dtypes[signal] = None  # update when loading data
 
-        self.feature_names = None  # update when loading markers/features
-        self.label_names = None  # update when loading hand labels
+        self.input_size = 0
+        self.feature_names = []  # update when loading markers/features
+        self.label_names = []  # update when loading hand labels
 
         self.sequence_pad = sequence_pad
         self.sequence_length = sequence_length
@@ -372,6 +373,7 @@ class SingleDataset(data.Dataset):
                 else:
                     raise ValueError(f'"{file_ext}" is an invalid file extension')
 
+                self.input_size = data_curr.shape[1]
                 self.feature_names = feature_names
                 self.dtypes[signal] = 'float32'
 
@@ -430,6 +432,7 @@ class SingleDataset(data.Dataset):
                 else:
                     raise ValueError(f'"{file_ext}" is an invalid file extension')
 
+                self.label_names = self.label_names or label_names
                 self.dtypes[signal] = 'int32'
 
             else:
@@ -544,6 +547,7 @@ class DataGenerator(object):
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
+        self.input_size = self.datasets[0].input_size
         self.feature_names = self.datasets[0].feature_names
         self.label_names = self.datasets[0].label_names
 

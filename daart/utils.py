@@ -115,14 +115,8 @@ def build_data_generator(hparams: dict) -> DataGenerator:
     )
 
     # automatically compute input/output sizes from data
-    input_size = 0
-    for batch in data_gen.datasets[0].data['markers']:
-        if batch.shape[1] == 0:
-            continue
-        else:
-            input_size = batch.shape[1]
-            break
-    hparams['input_size'] = input_size
+    hparams['input_size'] = data_gen.input_size
+    hparams['output_size'] = len(data_gen.label_names)
 
     if hparams.get('lambda_task', 0) > 0:
         task_size = 0
