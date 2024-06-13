@@ -398,7 +398,7 @@ class SingleDataset(data.Dataset):
                     # if no path given, assume same size as markers and set all to background
                     if 'markers' in self.data.keys():
                         data_curr = np.zeros(
-                            (len(self.data['markers']) * sequence_length,), dtype=np.int)
+                            (len(self.data['markers']) * sequence_length,), dtype=int)
                     else:
                         raise FileNotFoundError(
                             'Could not load "labels_strong" from None file without markers')
@@ -636,12 +636,12 @@ class DataGenerator(object):
 
         assert 'labels_strong' in self.signals[0], 'Cannot count examples without hand labels'
 
-        totals = np.zeros(len(self.label_names), dtype=np.int)
+        totals = np.zeros(len(self.label_names), dtype=int)
         for dataset in self.datasets:
             pad = dataset.sequence_pad
             for b, batch in enumerate(dataset.data['labels_strong']):
                 # log number of examples for batch
-                counts = np.bincount(batch[pad:-pad].astype('int'))
+                counts = np.bincount(batch[pad:-pad].astype(int))
                 if len(counts) == len(totals):
                     totals += counts
                 else:
@@ -874,7 +874,7 @@ def load_label_csv(filepath: str) -> tuple:
 
     """
     labels = np.genfromtxt(
-        filepath, delimiter=',', dtype=np.int, encoding=None, skip_header=1)[:, 1:]
+        filepath, delimiter=',', dtype=int, encoding=None, skip_header=1)[:, 1:]
     label_names = list(
         np.genfromtxt(filepath, delimiter=',', dtype=None, encoding=None, max_rows=1)[1:])
     return labels, label_names

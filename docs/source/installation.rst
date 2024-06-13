@@ -29,7 +29,7 @@ Then, create a conda environment:
 
 .. code-block:: console
 
-    conda create --name daart python=3.6
+    conda create --name daart python=3.10
 
 Active the new environment:
 

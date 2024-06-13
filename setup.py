@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 
-VERSION = '1.0.2'
+VERSION = '1.1.0'
 
 # add the README.md file to the long_description
 with open('README.md', 'r') as fh:
@@ -12,7 +12,7 @@ install_requires = [
     'jupyter',
     'matplotlib',
     'numpy',
-    'opencv-python',
+    'opencv-python-headless',
     'pandas',
     'pytest',
     'pyyaml',
@@ -21,7 +21,7 @@ install_requires = [
     'seaborn',
     'tables',
     'test-tube',
-    'torch==1.8.0',
+    'torch',
     'tqdm',
     'typeguard',
 ]

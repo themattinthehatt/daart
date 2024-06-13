@@ -81,7 +81,7 @@ class Logger(object):
             self,
             dtype: str,
             loss_dict: dict,
-            dataset: Union[int, np.int64, list, None] = None
+            dataset: Union[int, int, list, None] = None
     ) -> None:
         """Update metrics for a specific dtype/dataset.
 
@@ -123,12 +123,12 @@ class Logger(object):
     def create_metric_row(
             self,
             dtype: str,
-            epoch: Union[int, np.int64],
-            batch: Union[int, np.int64],
-            dataset: Union[int, np.int64],
-            trial: Union[int, np.int64, None],
-            best_epoch: Optional[Union[int, np.int64]] = None,
-            by_dataset: bool = False
+            epoch: Union[int, int],
+            batch: Union[int, int],
+            dataset: Union[int, int],
+            trial: Union[int, int, None],
+            best_epoch: Optional[Union[int, int]] = None,
+            by_dataset: bool = False,
     ) -> dict:
         """Export metrics and other data (e.g. epoch) for logging train progress.
 
