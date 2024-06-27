@@ -11,7 +11,7 @@ install_requires = [
     'ipykernel',
     'jupyter',
     'matplotlib',
-    'numpy',
+    'numpy<2.0.0',  # compatability issues w/ pandas as of June 2024
     'opencv-python-headless',
     'pandas',
     'pytest',
