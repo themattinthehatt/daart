@@ -11,14 +11,18 @@ from daart.transforms import ZScore
 __all__ = ['build_data_generator', 'collect_callbacks']
 
 
-def build_data_generator(hparams: dict) -> DataGenerator:
+def build_data_generator(hparams: dict, dtype='train') -> DataGenerator:
     """Helper function to build a data generator from hparam dict."""
 
     signals = []
     transforms = []
     paths = []
-
-    for expt_id in hparams['expt_ids']:
+    if dtype == 'train':
+        expt_ids = hparams['expt_ids']
+    else:
+        expt_ids = hparams['expt_ids_test']
+        
+    for expt_id in expt_ids:
 
         signals_curr = []
         transforms_curr = []
@@ -50,7 +54,7 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
         # hand labels
         if hparams.get('lambda_strong', 0) > 0:
-            if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
+            if expt_id not in hparams.get('expt_ids_to_keep',expt_ids) and dtype=='train':
                 hand_labels_file = None
             else:
                 base_dir = os.path.join(hparams['data_dir'], 'labels-hand')
@@ -68,6 +72,57 @@ def build_data_generator(hparams: dict) -> DataGenerator:
             signals_curr.append('labels_strong')
             transforms_curr.append(None)
             paths_curr.append(hand_labels_file)
+
+#     for expt_id in hparams['expt_ids']:
+
+#         signals_curr = []
+#         transforms_curr = []
+#         paths_curr = []
+
+#         # DLC markers or features (e.g. from simba)
+#         input_type = hparams.get('input_type', 'markers')
+#         base_dir = os.path.join(hparams['data_dir'], input_type)
+#         possible_markers_files = [
+#             os.path.join(base_dir, expt_id + '_labeled.h5'),
+#             os.path.join(base_dir, expt_id + '_labeled.csv'),
+#             os.path.join(base_dir, expt_id + '_labeled.npy'),
+#             os.path.join(base_dir, expt_id + '.h5'),
+#             os.path.join(base_dir, expt_id + '.csv'),
+#             os.path.join(base_dir, expt_id + '.npy'),
+#         ]
+#         markers_file = None
+#         for marker_file_ in possible_markers_files:
+#             if os.path.exists(marker_file_):
+#                 markers_file = marker_file_
+#                 break
+#         if markers_file is None:
+#             msg = f'did not find marker file for {expt_id} in {base_dir}'
+#             logging.info(msg)
+#             raise FileNotFoundError(msg)
+#         signals_curr.append('markers')
+#         transforms_curr.append(ZScore())
+#         paths_curr.append(markers_file)
+
+#         # hand labels
+#         if hparams.get('lambda_strong', 0) > 0:
+#             if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
+#                 hand_labels_file = None
+#             else:
+#                 base_dir = os.path.join(hparams['data_dir'], 'labels-hand')
+#                 possible_hand_labels_files = [
+#                     os.path.join(base_dir, expt_id + '_labels.csv'),
+#                     os.path.join(base_dir, expt_id + '.csv'),
+#                 ]
+#                 hand_labels_file = None
+#                 for hand_labels_file_ in possible_hand_labels_files:
+#                     if os.path.exists(hand_labels_file_):
+#                         hand_labels_file = hand_labels_file_
+#                         break
+#                 if hand_labels_file is None:
+#                     logging.warning(f'did not find hand labels file for {expt_id} in {base_dir}')
+#             signals_curr.append('labels_strong')
+#             transforms_curr.append(None)
+#             paths_curr.append(hand_labels_file)
 
         # heuristic labels
         if hparams.get('lambda_weak', 0) > 0:
@@ -101,10 +156,9 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
     # compute padding needed to account for convolutions
     hparams['sequence_pad'] = compute_sequence_pad(hparams)
-
     # build data generator
     data_gen = DataGenerator(
-        hparams['expt_ids'], signals, transforms, paths,
+        expt_ids, signals, transforms, paths,
         device=hparams['device'],
         sequence_length=hparams['sequence_length'],
         sequence_pad=hparams['sequence_pad'],
@@ -112,6 +166,7 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         trial_splits=hparams['trial_splits'],
         train_frac=hparams['train_frac'],
         input_type=hparams.get('input_type', 'markers'),
+        batch_transform_params=hparams.get('batch_transform_params', {})
     )
 
     # automatically compute input/output sizes from data

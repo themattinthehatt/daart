@@ -272,6 +272,9 @@ class Trainer(object):
         self.curr_batch = 0
         self.val_check_batch = None
         self.should_halt = False
+        
+        # batch transforms
+        self.batch_transforms = kwargs['batch_transforms']
 
     def fit(self, model, data_generator, save_path):
         """Fit pytorch models with stochastic gradient descent and early stopping.
@@ -367,7 +370,7 @@ class Trainer(object):
                 optimizer.zero_grad()
 
                 # get next minibatch and put it on the device
-                data, datasets = data_generator.next_batch('train')
+                data, datasets = data_generator.next_batch('train',transforms=self.batch_transforms)
 
                 # call the appropriate loss function
                 loss_dict = model.training_step(data, accumulate_grad=True)
@@ -399,22 +402,22 @@ class Trainer(object):
                         )
 
                     # save best val model
-                    if logger.get_loss('val') < best_val_loss:
-                        best_val_loss = logger.get_loss('val')
-                        model.save(os.path.join(save_path, 'best_val_model.pt'))
-                        best_model_saved = True
-                        best_val_epoch = i_epoch
+                    # if logger.get_loss('val') < best_val_loss:
+                    #     best_val_loss = logger.get_loss('val')
+                    #     model.save(os.path.join(save_path, 'best_val_model.pt'))
+                    #     best_model_saved = True
+                    #     best_val_epoch = i_epoch
 
-                    # export aggregated metrics on val data
-                    logger.create_metric_row(
-                        dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
-                        by_dataset=False, best_epoch=best_val_epoch)
-                    # export individual dataset metrics on val data if possible
-                    if data_generator.n_datasets > 1:
-                        for dataset in range(data_generator.n_datasets):
-                            logger.create_metric_row(
-                                dtype='val', epoch=i_epoch, batch=i_batch, dataset=dataset,
-                                trial=-1, by_dataset=True, best_epoch=best_val_epoch)
+                    # # export aggregated metrics on val data
+                    # logger.create_metric_row(
+                    #     dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
+                    #     by_dataset=False, best_epoch=best_val_epoch)
+                    # # export individual dataset metrics on val data if possible
+                    # if data_generator.n_datasets > 1:
+                    #     for dataset in range(data_generator.n_datasets):
+                    #         logger.create_metric_row(
+                    #             dtype='val', epoch=i_epoch, batch=i_batch, dataset=dataset,
+                    #             trial=-1, by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
             # export training metrics at end of epoch

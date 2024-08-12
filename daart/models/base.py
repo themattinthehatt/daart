@@ -601,7 +601,13 @@ class Segmenter(BaseModel):
             # reshape predictions to fit into class loss; needs to be (n_examples, n_classes)
             labels_strong_reshape = torch.reshape(
                 outputs_dict['labels'], (-1, outputs_dict['labels'].shape[-1]))
+            #print('labels_strong_reshape', labels_strong_reshape.shape, labels_strong_reshape)
+            #print('labels_strong', labels_strong.shape, labels_strong)
             loss_strong = self.class_loss(labels_strong_reshape, labels_strong)
+            #print('loss_strong', loss_strong)
+            if torch.isnan(loss_strong).any():
+                #print('lab s', np.unique(labels_strong))
+                loss_strong = torch.tensor([0]).to(self.hparams['device'])
             loss += lambda_strong * loss_strong
             loss_strong_val = loss_strong.item()
             # log
@@ -645,7 +651,7 @@ class Segmenter(BaseModel):
             loss_dict['kl_weight'] = kl_weight
             loss_dict['loss_kl'] = loss_kl.item()
 
-        if accumulate_grad:
+        if accumulate_grad and loss.item() != 0:
             loss.backward()
 
         # collect loss vals

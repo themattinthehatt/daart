@@ -492,7 +492,8 @@ class DataGenerator(object):
             num_workers: int = 0,
             pin_memory: bool = False,
             sequence_pad: int = 0,
-            input_type: str = 'markers'
+            input_type: str = 'markers',
+            batch_transform_params = {}
     ) -> None:
         """
 
@@ -539,7 +540,7 @@ class DataGenerator(object):
         self.batch_size = batch_size
         self.as_numpy = as_numpy
         self.device = device
-
+        self.batch_transform_params = batch_transform_params
         self.datasets = []
         self.signals = signals_list
         self.transforms = transforms_list
@@ -675,7 +676,7 @@ class DataGenerator(object):
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
     @typechecked
-    def next_batch(self, dtype: str) -> tuple:
+    def next_batch(self, dtype: str, transforms: Union[iter, None]=[]) -> tuple:
         """Return next batch of data.
 
         The data generator iterates randomly through datasets and trials. Once a dataset runs out
@@ -710,6 +711,58 @@ class DataGenerator(object):
             # get sequence from this dataset
             try:
                 sequence = next(self.dataset_iters[dataset][dtype])
+                #print('seq', sequence)
+                
+                #########################
+                #### ADD TRANSFORMS HERE
+                #########################
+                # transforms on x,y paw coords for ibl data
+                # (z scoreing already done)
+                if dtype == 'train':
+                    # load transform hyper params
+                    params = self.batch_transform_params
+                    
+                    # do rotation transform
+                    if 'rotate' in transforms:
+                        angle = params['angle']
+                        degrees = np.random.uniform(-1 * angle, angle)
+                        #print('angle', angle)
+                        temp = sequence['markers'] # shape (1, seq_len, input_len)
+                        points = temp[0,:,:2]
+                        points_rotated = rotate(points, degrees=degrees)
+                        temp[0,:,:2] = points_rotated
+                        sequence['markers'] = temp
+                        
+                    if 'shift' in transforms:
+                        u_max = params['shift_max']
+                        u_min = -1 * u_max
+                        temp = sequence['markers'] # shape (1, seq_len, input_len)
+                        points = temp[0,:,:2]
+                        points_rotated = shift(points, u_min, u_max)
+                        temp[0,:,:2] = points_rotated
+                        sequence['markers'] = temp
+                        
+                    if 'gaussian_noise' in transforms:
+                        sigma = params['sigma']
+                        temp = sequence['markers'] # shape (1, seq_len, input_len)
+                        points = temp[0,:,:]
+                        points_rotated = gaussian_noise(points, sigma)
+                        temp[0,:,:] = points_rotated
+                        sequence['markers'] = temp
+                        
+                    if 'shot_noise' in transforms:
+                        u_max = params['shot_max']
+                        u_min = -1 * u_max
+                        temp = sequence['markers'] # shape (1, seq_len, input_len)
+                        points = temp[0,:,:2]
+                        points_rotated = shot_noise(points, u_min, u_max)
+                        temp[0,:,:2] = points_rotated
+                        sequence['markers'] = temp
+                       
+                ########################
+                ### END TRNASFORMS
+                ########################
+                
                 # add sequence to batch
                 sequences.append(sequence)
                 datasets.append(dataset)
@@ -744,7 +797,40 @@ class DataGenerator(object):
             if self.device == 'cuda':
                 batch = {key: val.to('cuda') for key, val in batch.items()}
 
-        return batch, datasets
+        return batch, datasets   
+    
+
+def rotate(p, origin=(0, 0), degrees=0):
+    angle = np.deg2rad(degrees)
+    R = np.array([[np.cos(angle), -np.sin(angle)],
+                  [np.sin(angle),  np.cos(angle)]])
+    o = np.atleast_2d(origin)
+    p = np.atleast_2d(p)
+    return torch.tensor(np.squeeze((R @ (p.T-o.T) + o.T).T))
+
+def shift(p, u_min, u_max):
+    x_shift = np.random.uniform(u_min, u_max)
+    y_shift = np.random.uniform(u_min, u_max)
+    p[:,0] += x_shift
+    p[:,1] += y_shift
+    return p
+
+def gaussian_noise(p, sigma):
+    n = p.shape[0]
+    d = p.shape[1]
+    noise = np.random.normal(0, sigma, (n,d))
+    p += noise
+    return p
+
+def shot_noise(p, u_min, u_max):
+    ind = np.random.choice([0,1], p.shape, p=[0.99, .01])
+    #print('ind', ind.shape, ind)
+    noise = np.random.uniform(u_min, u_max, p.shape)
+    #print('noise', noise.shape, noise)
+    masked_noise = ind * noise
+    #print('masked_noise',masked_noise.shape, masked_noise)
+    p += masked_noise
+    return p
 
 
 @typechecked

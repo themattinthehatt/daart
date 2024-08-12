@@ -16,40 +16,68 @@ from daart.utils import build_data_generator, collect_callbacks
 
 
 def run_main(hparams, *args):
-
     # set return value
     ret_val = None
 
-    try:
+#     try:
 
-        if not isinstance(hparams, dict):
-            hparams = vars(hparams)
+#         if not isinstance(hparams, dict):
+#             hparams = vars(hparams)
 
-        # start at random times (so test tube creates separate folders)
-        t = time.time()
-        np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
-        time.sleep(np.random.uniform(2))
+#         # start at random times (so test tube creates separate folders)
+#         t = time.time()
+#         np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
+#         time.sleep(np.random.uniform(2))
 
-        # create test-tube experiment
-        hparams['expt_ids'] = hparams['expt_ids'].split(';')
-        hparams, exp = create_tt_experiment(hparams)
-        if hparams is None:
-            print('Experiment exists! Aborting fit')
-            return
+#         # create test-tube experiment
+#         hparams['expt_ids'] = hparams['expt_ids'].split(';')
+#         hparams, exp = create_tt_experiment(hparams)
+#         if hparams is None:
+#             print('Experiment exists! Aborting fit')
+#             return
 
-        # set up error logging (different from train logging)
-        logging.basicConfig(
-            filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
-            filemode='w', level=logging.INFO,
-            format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
-        )
-        logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
+#         # set up error logging (different from train logging)
+#         logging.basicConfig(
+#             filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
+#             filemode='w', level=logging.INFO,
+#             format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
+#         )
+#         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
 
-        # run train model script
-        train_model(hparams)
+#         # run train model script
+#         train_model(hparams)
 
-    except Exception as e:
-        ret_val = e
+#     except Exception as e:
+#         ret_val = e
+
+#     return ret_val
+
+    if not isinstance(hparams, dict):
+        hparams = vars(hparams)
+
+    # start at random times (so test tube creates separate folders)
+    t = time.time()
+    np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
+    time.sleep(np.random.uniform(2))
+
+    # create test-tube experiment
+    hparams['expt_ids'] = hparams['expt_ids'].split(';')
+    hparams['expt_ids_test'] = hparams['expt_ids_test'].split(';')
+    hparams, exp = create_tt_experiment(hparams)
+    if hparams is None:
+        print('Experiment exists! Aborting fit')
+        return
+
+    # set up error logging (different from train logging)
+    logging.basicConfig(
+        filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
+        filemode='w', level=logging.INFO,
+        format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
+    )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
+
+    # run train model script
+    train_model(hparams)
 
     return ret_val
 
@@ -102,7 +130,6 @@ def train_model(hparams):
     callbacks = collect_callbacks(hparams)
     trainer = Trainer(**hparams, callbacks=callbacks)
     trainer.fit(model, data_gen, save_path=hparams['tt_version_dir'])
-
     # update hparams upon successful training
     hparams['training_completed'] = True
     export_hparams(hparams)
@@ -120,18 +147,26 @@ def train_model(hparams):
             save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
             format='png',
         )
-        plot_training_curves(
-            metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
-            dtype='val',
-            expt_ids=hparams['expt_ids'],
-            save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
-            format='png',
-        )
+        # plot_training_curves(
+        #     metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
+        #     dtype='val',
+        #     expt_ids=hparams['expt_ids'],
+        #     save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
+        #     format='png',
+        # )
 
     # run model inference on all training sessions
     if hparams['train_frac'] != 1.0:  # rebuild data generator to include all data if necessary
         hparams['train_frac'] = 1.0
         data_gen = build_data_generator(hparams)
+    results_dict = model.predict_labels(data_gen)
+    for sess, dataset in enumerate(data_gen.datasets):
+        expt_id = dataset.id
+        labels = np.vstack(results_dict['labels'][sess])
+        np.save(os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy'), labels)
+        
+    # run model inference on all test sessions
+    data_gen = build_data_generator(hparams, dtype='test')
     results_dict = model.predict_labels(data_gen)
     for sess, dataset in enumerate(data_gen.datasets):
         expt_id = dataset.id
@@ -155,7 +190,6 @@ if __name__ == '__main__':
     (see daart.readthedocs.io). 
     
     """
-
     hyperparams = get_all_params()
 
     if hyperparams.device == 'cuda':
