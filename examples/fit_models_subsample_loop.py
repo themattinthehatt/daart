@@ -21,7 +21,8 @@ def run_main(args):
     elif args.dataset == 'fly' or args.dataset == 'fly-4' or args.dataset == 'fly-5':
         from daart_utils.session_ids.fly import SESS_IDS_TRAIN_5 as sess_ids_list
     elif args.dataset == 'ibl':
-        from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_5 as sess_ids_list
+        from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_28 as sess_ids_list
+        #from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_5 as sess_ids_list
     elif args.dataset == 'mouse-oft-aligned' \
             or args.dataset == 'mouse-oft-aligned-new' \
             or args.dataset == 'mouse-oft':
@@ -68,7 +69,7 @@ def run_main(args):
     sess_ids = sess_ids_list[0]
     pre = args.pre
     fracs = args.fracs.split(';')
-
+    print('mod types', model_types)
     for model_type in model_types:
 
         # create temporary config files (will be updated each iteration, then deleted)
@@ -186,7 +187,7 @@ def run_main(args):
                     update_config(
                         config_files['model'], 'model_class', model_type)
                     args.grid_search_file = '/home/bsb2144/daart_utils/scripts/fit_models.py'
-
+                print('call grind')
                 call_str = [
                     'python',
                     args.grid_search_file,

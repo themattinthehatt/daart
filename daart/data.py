@@ -676,7 +676,7 @@ class DataGenerator(object):
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
     @typechecked
-    def next_batch(self, dtype: str, transforms: Union[iter, None]=[]) -> tuple:
+    def next_batch(self, dtype: str, transforms: Union[iter, None]=None) -> tuple:
         """Return next batch of data.
 
         The data generator iterates randomly through datasets and trials. Once a dataset runs out
@@ -716,49 +716,50 @@ class DataGenerator(object):
                 #########################
                 #### ADD TRANSFORMS HERE
                 #########################
-                # transforms on x,y paw coords for ibl data
-                # (z scoreing already done)
-                if dtype == 'train':
-                    # load transform hyper params
-                    params = self.batch_transform_params
-                    
-                    # do rotation transform
-                    if 'rotate' in transforms:
-                        angle = params['angle']
-                        degrees = np.random.uniform(-1 * angle, angle)
-                        #print('angle', angle)
-                        temp = sequence['markers'] # shape (1, seq_len, input_len)
-                        points = temp[0,:,:2]
-                        points_rotated = rotate(points, degrees=degrees)
-                        temp[0,:,:2] = points_rotated
-                        sequence['markers'] = temp
-                        
-                    if 'shift' in transforms:
-                        u_max = params['shift_max']
-                        u_min = -1 * u_max
-                        temp = sequence['markers'] # shape (1, seq_len, input_len)
-                        points = temp[0,:,:2]
-                        points_rotated = shift(points, u_min, u_max)
-                        temp[0,:,:2] = points_rotated
-                        sequence['markers'] = temp
-                        
-                    if 'gaussian_noise' in transforms:
-                        sigma = params['sigma']
-                        temp = sequence['markers'] # shape (1, seq_len, input_len)
-                        points = temp[0,:,:]
-                        points_rotated = gaussian_noise(points, sigma)
-                        temp[0,:,:] = points_rotated
-                        sequence['markers'] = temp
-                        
-                    if 'shot_noise' in transforms:
-                        u_max = params['shot_max']
-                        u_min = -1 * u_max
-                        temp = sequence['markers'] # shape (1, seq_len, input_len)
-                        points = temp[0,:,:2]
-                        points_rotated = shot_noise(points, u_min, u_max)
-                        temp[0,:,:2] = points_rotated
-                        sequence['markers'] = temp
-                       
+                if transforms:
+                    # transforms on x,y paw coords for ibl data
+                    # (z scoreing already done)
+                    if dtype == 'train':
+                        # load transform hyper params
+                        params = self.batch_transform_params
+
+                        # do rotation transform
+                        if 'rotate' in transforms:
+                            angle = params['angle']
+                            degrees = np.random.uniform(-1 * angle, angle)
+                            #print('angle', angle)
+                            temp = sequence['markers'] # shape (1, seq_len, input_len)
+                            points = temp[0,:,:2]
+                            points_rotated = rotate(points, degrees=degrees)
+                            temp[0,:,:2] = points_rotated
+                            sequence['markers'] = temp
+
+                        if 'shift' in transforms:
+                            u_max = params['shift_max']
+                            u_min = -1 * u_max
+                            temp = sequence['markers'] # shape (1, seq_len, input_len)
+                            points = temp[0,:,:2]
+                            points_rotated = shift(points, u_min, u_max)
+                            temp[0,:,:2] = points_rotated
+                            sequence['markers'] = temp
+
+                        if 'gaussian_noise' in transforms:
+                            sigma = params['sigma']
+                            temp = sequence['markers'] # shape (1, seq_len, input_len)
+                            points = temp[0,:,:]
+                            points_rotated = gaussian_noise(points, sigma)
+                            temp[0,:,:] = points_rotated
+                            sequence['markers'] = temp
+
+                        if 'shot_noise' in transforms:
+                            u_max = params['shot_max']
+                            u_min = -1 * u_max
+                            temp = sequence['markers'] # shape (1, seq_len, input_len)
+                            points = temp[0,:,:2]
+                            points_rotated = shot_noise(points, u_min, u_max)
+                            temp[0,:,:2] = points_rotated
+                            sequence['markers'] = temp
+
                 ########################
                 ### END TRNASFORMS
                 ########################
@@ -903,7 +904,7 @@ def load_feature_csv(filepath: str) -> tuple:
         - marker names (list): name for each column of `x` and `y` matrices
 
     """
-    df = pd.read_csv(filepath)
+    df = pd.read_csv(filepath).head(100000)
     # drop first column if it just contains frame indices
     unnamed_col = 'Unnamed: 0'
     if unnamed_col in list(df.columns):

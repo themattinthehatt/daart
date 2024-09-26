@@ -17,6 +17,7 @@ from daart.utils import build_data_generator, collect_callbacks
 
 def run_main(hparams, *args):
     # set return value
+    print('run_main')
     ret_val = None
 
 #     try:
@@ -55,6 +56,7 @@ def run_main(hparams, *args):
     if not isinstance(hparams, dict):
         hparams = vars(hparams)
 
+    #print('hp', hparams)
     # start at random times (so test tube creates separate folders)
     t = time.time()
     np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
@@ -190,13 +192,15 @@ if __name__ == '__main__':
     (see daart.readthedocs.io). 
     
     """
+    print('main')
     hyperparams = get_all_params()
-
+    #print('hyperparams',hyperparams)
     if hyperparams.device == 'cuda':
         if isinstance(hyperparams.gpus_vis, int):
             gpu_ids = [str(hyperparams.gpus_vis)]
         else:
             gpu_ids = hyperparams.gpus_vis.split(';')
+        print('gpu_ids',gpu_ids)
         results = hyperparams.optimize_parallel_gpu(
             run_main,
             gpu_ids=gpu_ids)
