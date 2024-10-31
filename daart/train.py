@@ -7,6 +7,8 @@ import torch
 from tqdm import tqdm
 from typing import Optional, Union
 from typeguard import typechecked
+import time
+import logging
 
 from daart.io import make_dir_if_not_exists
 
@@ -341,6 +343,10 @@ class Trainer(object):
         # -----------------------------------
         # train loop
         # -----------------------------------
+        
+        # start time
+        start_time = time.time()
+
         for i_epoch in tqdm(range(self.max_epochs + 1)):
             # Note: the 0th epoch has no training (randomly initialized model is evaluated) so we
             # cycle through `max_epochs` training epochs
@@ -443,6 +449,19 @@ class Trainer(object):
             if self.should_halt:
                 # break out of training loop; trainer.should_halt is modified by callbacks
                 break
+                
+                
+        # log time
+        # End time
+        end_time = time.time()
+
+        # Calculate the time taken
+        elapsed_time = end_time - start_time
+        logging.info(f"The for loop took {elapsed_time:.6f} seconds to complete.")
+
+        print(f"The for loop took {elapsed_time:.6f} seconds to complete.")
+        
+        
 
         # ---------------------------------------
         # wrap up with final save/eval
