@@ -49,6 +49,13 @@ def test_split_trials():
     max_val = np.max(splits['val'])
     assert not np.any(splits['test'] == max_val + 1)
 
+    # make sure trials are randomly circularly rotated
+    splits0 = split_trials(100, 0, 8, 1, 1, 0)
+    splits1 = split_trials(100, 1, 8, 1, 1, 0)
+    assert not np.array_equal(np.sort(splits0['train']), np.sort(splits1['train']))
+    assert not np.array_equal(np.sort(splits0['val']), np.sort(splits1['val']))
+    assert not np.array_equal(np.sort(splits0['test']), np.sort(splits1['test']))
+
 
 def test_compute_sequences():
 
