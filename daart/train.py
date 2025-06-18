@@ -81,7 +81,8 @@ class Logger(object):
             self,
             dtype: str,
             loss_dict: dict,
-            dataset: Union[int, int, list, None] = None
+            dataset: Union[int, list, None] = None,
+            batches: int = 1,
     ) -> None:
         """Update metrics for a specific dtype/dataset.
 
@@ -94,9 +95,11 @@ class Logger(object):
             dictionary returned by `loss` attribute of models
         dataset : int or NoneType, optional
             if NoneType, updates the aggregated metrics; if `int`, updates the associated dataset
+        batches : int, optional
+            number of sequences in batch
 
         """
-        metrics = {**loss_dict, 'batches': 1}  # append `batches` to loss_dict
+        metrics = {**loss_dict, 'batches': batches}  # append `batches` to loss_dict
 
         for key, val in metrics.items():
 
@@ -368,7 +371,9 @@ class Trainer(object):
 
                 # call the appropriate loss function
                 loss_dict = model.training_step(data, accumulate_grad=True)
-                logger.update_metrics('train', loss_dict, dataset=datasets)
+                logger.update_metrics(
+                    'train', loss_dict, dataset=datasets, batches=data['markers'].shape[0]
+                )
 
                 # step (evaluate untrained network on epoch 0)
                 if i_epoch > 0:
@@ -389,7 +394,9 @@ class Trainer(object):
 
                         # call the appropriate loss function
                         loss_dict = model.training_step(data, accumulate_grad=False)
-                        logger.update_metrics('val', loss_dict, dataset=datasets)
+                        logger.update_metrics(
+                            'val', loss_dict, dataset=datasets, batches=data['markers'].shape[0],
+                        )
 
                     # save best val model
                     if logger.get_loss('val') < best_val_loss:
