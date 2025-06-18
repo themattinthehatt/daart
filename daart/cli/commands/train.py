@@ -188,15 +188,6 @@ def run_main(hparams, *args):
 
         # Set up error logging
         log_file = os.path.join(hparams['tt_version_dir'], 'console.log')
-        # logging.basicConfig(
-        #     filename=log_file,
-        #     filemode='w',
-        #     level=logging.INFO,
-        #     format='%(asctime)s %(message)s',
-        #     datefmt='%m/%d/%Y %H:%M:%S',
-        # )
-
-        # Add console handler if not already present
         logger = logging.getLogger('DAART.CLI.TRAIN')
         if not any(isinstance(h, logging.FileHandler) for h in logger.handlers):
             logger.addHandler(logging.FileHandler(log_file))
@@ -270,6 +261,10 @@ def train_model(hparams):
     # Export artifacts
     export_training_artifacts(hparams, model, data_gen)
 
+    # Run model inference on additional sessions if desired
+    if hparams.get('eval_dir'):
+        export_model_predictions(model_dir=hparams['tt_version_dir'], eval_dir=hparams['eval_dir'])
+
 
 def export_training_artifacts(hparams, model, data_gen):
     """Export training artifacts (plots, predictions, etc.)."""
@@ -306,6 +301,28 @@ def export_training_artifacts(hparams, model, data_gen):
         labels = np.vstack(results_dict['labels'][sess])
         output_file = os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy')
         np.save(output_file, labels)
+        _logger.info(f'Saved predictions to {output_file}')
+
+
+def export_model_predictions(model_dir, eval_dir):
+    if not Path(eval_dir).is_dir():
+        _logger.error(f'{eval_dir} is not a directory; aborting')
+        return
+    from daart.api.model import Model
+    model = Model.from_dir(model_dir)
+    eval_dir = Path(eval_dir)
+    expt_files = list(eval_dir.glob('*.csv'))
+    _logger.info(f'Evaluating model on {len(expt_files)} sessions in {eval_dir}')
+    for expt_file in expt_files:
+        if not expt_file.is_file():
+            _logger.error(f'{expt_file} does not exist; skipping')
+            continue
+        expt_id = expt_file.stem
+        output_file = os.path.join(model_dir, f'{expt_id}_states.npy')
+        if os.path.exists(output_file):
+            _logger.info(f'{output_file} already exists; skipping')
+            continue
+        model.predict(expt_file, output_file, expt_id)
         _logger.info(f'Saved predictions to {output_file}')
 
 
