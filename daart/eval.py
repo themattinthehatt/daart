@@ -157,8 +157,6 @@ def plot_training_curves(
     Additionally, multiple models can be plotted simultaneously by varying one (and only one) of
     the following parameters:
 
-    TODO
-
     Each of these entries must be an array of length 1 except for one option, which can be an array
     of arbitrary length (corresponding to already trained models). This function generates a single
     plot with panels for each of the following terms:
@@ -189,19 +187,39 @@ def plot_training_curves(
 
     metrics_dfs = [load_metrics_csv_as_df(metrics_file, metrics_list, expt_ids=expt_ids)]
     metrics_df = pd.concat(metrics_dfs, sort=False)
+    data_queried = metrics_df[
+        (metrics_df.epoch > 10) & ~pd.isna(metrics_df.val) & (metrics_df.dtype == dtype)]
 
     if isinstance(expt_ids, list) and len(expt_ids) > 1:
         hue = 'dataset'
+
+        # get unique hue values
+        hue_values = data_queried[hue].unique()
+
+        # create a palette where one specific value is black
+        palette = sns.color_palette('husl', len(hue_values))  # or any default palette
+        palette_dict = dict(zip(hue_values, palette))
+
+        # get all unique hue values and put special value last
+        hue_order = [v for v in data_queried[hue].unique() if v != 'all']
+        hue_order.append('all')
+
+        # Set special value to black
+        palette_dict['all'] = 'black'
+
     else:
         hue = None
+        hue_order = None
+        palette_dict = None
 
     sns.set_style('white')
     sns.set_context('talk')
-    data_queried = metrics_df[
-        (metrics_df.epoch > 10) & ~pd.isna(metrics_df.val) & (metrics_df.dtype == dtype)]
     g = sns.FacetGrid(
-        data_queried, col='loss', col_wrap=2, hue=hue, sharey=False, height=4)
+        data_queried, col='loss', col_wrap=2, hue=hue, sharey=False, height=4,
+        hue_order=hue_order, palette=palette_dict,
+    )
     g = g.map(plt.plot, 'epoch', 'val').add_legend()
+    g.set(yscale='log')
 
     if save_file is not None:
         make_dir_if_not_exists(save_file)
