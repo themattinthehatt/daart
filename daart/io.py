@@ -1,5 +1,7 @@
 """File IO for daart package."""
 
+from pathlib import Path
+
 import csv
 import numpy as np
 import os
@@ -19,6 +21,7 @@ __all__ = [
     'export_expt_info_to_csv',
     'export_hparams',
     'make_dir_if_not_exists',
+    'load_config',
 ]
 
 
@@ -378,3 +381,26 @@ def make_dir_if_not_exists(save_file: str) -> None:
     """
     save_dir = os.path.dirname(save_file)
     os.makedirs(save_dir, exist_ok=True)
+
+
+@typechecked
+def load_config(path: str | Path) -> dict:
+    """Load yaml configuration file to a nested dictionary structure.
+
+    Parameters
+    ----------
+    path: absolute path to config yaml file
+
+    Returns
+    -------
+    nested configuration dictionary
+
+    """
+
+    path = Path(path)
+    assert path.is_file(), f'{path} does not exist'
+
+    with open(path, 'r') as file:
+        config = yaml.safe_load(file)
+
+    return config

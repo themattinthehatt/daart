@@ -69,7 +69,7 @@ def train_model(hparams):
     logging.info(data_gen)
 
     # pull class weights out of labeled training data
-    if hparams.get('weight_classes', False):
+    if hparams.get('weight_classes', True):
         totals = data_gen.count_class_examples()
         idx_background = hparams.get('ignore_class', 0)
         if idx_background in np.arange(len(totals)):
