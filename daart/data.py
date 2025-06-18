@@ -108,6 +108,12 @@ def split_trials(
     for dtype in ['train', 'val', 'test']:
         batch_idxs[dtype] = np.concatenate(batch_idxs[dtype], axis=0)
 
+    # apply random circular shift to introduce more variability
+    # only need to shift by up to tr_per_block since the pattern repeats
+    shift = np.random.randint(0, tr_per_block)
+    for dtype in ['train', 'val', 'test']:
+        batch_idxs[dtype] = (batch_idxs[dtype] + shift) % n_trials
+
     return batch_idxs
 
 
