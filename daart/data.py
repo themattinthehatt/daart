@@ -23,6 +23,7 @@ from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
 from typing import List, Union
 from typeguard import typechecked
+from concurrent.futures import ThreadPoolExecutor
 
 
 __all__ = [
@@ -225,7 +226,9 @@ class SingleDataset(data.Dataset):
             as_numpy: bool = False,
             sequence_length: int = 500,
             sequence_pad: int = 0,
-            input_type: str = 'markers'
+            input_type: str = 'markers',
+            batch_transform_params = {},
+            batch_transforms = [],
     ) -> None:
         """
 
@@ -257,7 +260,9 @@ class SingleDataset(data.Dataset):
 
         # specify data
         self.id = id
-
+        self.video_dir = video_dir
+        self.inference = inference
+        self.expt_ids=expt_ids
         # get data paths
         self.signals = signals
         self.transforms = OrderedDict()
@@ -300,7 +305,7 @@ class SingleDataset(data.Dataset):
         return self.n_sequences
 
     @typechecked
-    def __getitem__(self, idx: Union[int, np.int64, None]) -> dict:
+    def __getitem__(self, idx: Union[int, np.int64, None]) -> Union[dict, bool]:
         """Return batch of data.
 
         Parameters
@@ -314,7 +319,9 @@ class SingleDataset(data.Dataset):
             data sample
 
         """
-
+        labels_seq = self.data['labels_strong'][idx]
+        #if (not self.inference) and (labels_seq.sum() == 0):
+         #   return False
         sample = OrderedDict()
         for signal in self.signals:
 
@@ -330,6 +337,67 @@ class SingleDataset(data.Dataset):
                     sample[signal] = torch.from_numpy(sample[signal][0]).float()
                 else:
                     sample[signal] = torch.from_numpy(sample[signal][0]).long()
+
+            if signal == 'markers':
+                # add data augment transforms
+                #########################
+                #### ADD TRANSFORMS HERE
+                #########################
+        
+                if self.batch_transforms:
+                    # transforms on x,y paw coords for ibl data
+                    # load transform hyper params
+                    params = self.batch_transform_params
+
+                    # do rotation transform
+                    if 'rotate' in self.batch_transforms:
+                        angle = params['angle']
+                        degrees = np.random.uniform(-1 * angle, angle)
+                        #print('angle', angle)
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = rotate(points, degrees=degrees)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+
+                    if 'shift' in self.batch_transforms:
+                        u_max = params['shift_max']
+                        u_min = -1 * u_max
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = shift(points, u_min, u_max)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+
+                    if 'gaussian_noise' in self.batch_transforms:
+                        sigma = params['sigma']
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:]
+                        points_rotated = gaussian_noise(points, sigma)
+                        temp[:,:] = points_rotated
+                        sample[signal] = temp
+
+                    if 'shot_noise' in self.batch_transforms:
+                        u_max = params['shot_max']
+                        u_min = -1 * u_max
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = shot_noise(points, u_min, u_max)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+                        
+                    # check if we add velocity
+                    if 'velocity' in self.batch_transforms:
+                        velocity = np.vstack([np.zeros_like(sample[signal][0]), np.diff(sample[signal], axis=0)])
+                        velocity = (velocity - self.v_mean) / self.v_std
+                        #print('pre shape', sample[signal].shape)
+                        sample[signal] = torch.tensor(np.hstack([sample[signal], velocity]), dtype=torch.float32)
+                        #print('post shape', sample[signal].shape)
+               
+
+                ########################
+                ### END TRANSFORMS
+                ########################
 
         # add batch index
         sample['batch_idx'] = idx
@@ -493,7 +561,8 @@ class DataGenerator(object):
             pin_memory: bool = False,
             sequence_pad: int = 0,
             input_type: str = 'markers',
-            batch_transform_params = {}
+            batch_transform_params = {},
+            batch_transforms = [],
     ) -> None:
         """
 
@@ -550,7 +619,9 @@ class DataGenerator(object):
             self.datasets.append(SingleDataset(
                 id=id, signals=signals, transforms=transforms, paths=paths, device=device,
                 as_numpy=self.as_numpy, sequence_length=sequence_length,
-                sequence_pad=sequence_pad, input_type=input_type))
+                sequence_pad=sequence_pad, input_type=input_type,
+                batch_transform_params = batch_transform_params, batch_transforms=batch_transforms,
+            ))
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
@@ -638,6 +709,8 @@ class DataGenerator(object):
     def __len__(self) -> int:
         return self.n_datasets
 
+    
+    
     @typechecked
     def count_class_examples(self) -> np.array:
 
@@ -675,6 +748,7 @@ class DataGenerator(object):
             else:
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
+                
     @typechecked
     def next_batch(self, dtype: str, transforms: Union[iter, None]=None) -> tuple:
         """Return next batch of data.
@@ -711,59 +785,8 @@ class DataGenerator(object):
             # get sequence from this dataset
             try:
                 sequence = next(self.dataset_iters[dataset][dtype])
-                #print('seq', sequence)
-                
-                #########################
-                #### ADD TRANSFORMS HERE
-                #########################
-                if transforms:
-                    # transforms on x,y paw coords for ibl data
-                    # (z scoreing already done)
-                    if dtype == 'train':
-                        # load transform hyper params
-                        params = self.batch_transform_params
-
-                        # do rotation transform
-                        if 'rotate' in transforms:
-                            angle = params['angle']
-                            degrees = np.random.uniform(-1 * angle, angle)
-                            #print('angle', angle)
-                            temp = sequence['markers'] # shape (1, seq_len, input_len)
-                            points = temp[0,:,:2]
-                            points_rotated = rotate(points, degrees=degrees)
-                            temp[0,:,:2] = points_rotated
-                            sequence['markers'] = temp
-
-                        if 'shift' in transforms:
-                            u_max = params['shift_max']
-                            u_min = -1 * u_max
-                            temp = sequence['markers'] # shape (1, seq_len, input_len)
-                            points = temp[0,:,:2]
-                            points_rotated = shift(points, u_min, u_max)
-                            temp[0,:,:2] = points_rotated
-                            sequence['markers'] = temp
-
-                        if 'gaussian_noise' in transforms:
-                            sigma = params['sigma']
-                            temp = sequence['markers'] # shape (1, seq_len, input_len)
-                            points = temp[0,:,:]
-                            points_rotated = gaussian_noise(points, sigma)
-                            temp[0,:,:] = points_rotated
-                            sequence['markers'] = temp
-
-                        if 'shot_noise' in transforms:
-                            u_max = params['shot_max']
-                            u_min = -1 * u_max
-                            temp = sequence['markers'] # shape (1, seq_len, input_len)
-                            points = temp[0,:,:2]
-                            points_rotated = shot_noise(points, u_min, u_max)
-                            temp[0,:,:2] = points_rotated
-                            sequence['markers'] = temp
-
-                ########################
-                ### END TRNASFORMS
-                ########################
-                
+                if not sequence:
+                    continue
                 # add sequence to batch
                 sequences.append(sequence)
                 datasets.append(dataset)
@@ -779,7 +802,8 @@ class DataGenerator(object):
                     break
                 else:
                     continue
-
+        if len(sequences) < 1:
+            return False,False
         batch = OrderedDict()
         if self.as_numpy:
             for i, signal in enumerate(sequences[0]):
@@ -800,7 +824,6 @@ class DataGenerator(object):
 
         return batch, datasets   
     
-
 def rotate(p, origin=(0, 0), degrees=0):
     angle = np.deg2rad(degrees)
     R = np.array([[np.cos(angle), -np.sin(angle)],
@@ -825,11 +848,8 @@ def gaussian_noise(p, sigma):
 
 def shot_noise(p, u_min, u_max):
     ind = np.random.choice([0,1], p.shape, p=[0.99, .01])
-    #print('ind', ind.shape, ind)
     noise = np.random.uniform(u_min, u_max, p.shape)
-    #print('noise', noise.shape, noise)
     masked_noise = ind * noise
-    #print('masked_noise',masked_noise.shape, masked_noise)
     p += masked_noise
     return p
 

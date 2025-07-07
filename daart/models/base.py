@@ -6,9 +6,10 @@ from scipy.stats import entropy
 import torch
 from sklearn.metrics import accuracy_score, r2_score
 from torch import nn, save
-
 from daart import losses
-
+from sklearn.metrics import f1_score
+import warnings
+warnings.filterwarnings("ignore")
 # to ignore imports for sphix-autoapidoc
 __all__ = [
     'reparameterize_gaussian',
@@ -402,6 +403,88 @@ class Segmenter(BaseModel):
             'sample': z,  # (n_sequences, sequence_length, embedding_dim)
         }
 
+    def predict_labels_vit(
+        self,
+        loader,
+        return_scores = False,
+        remove_pad = True,
+        mode = 'eval'
+    ):
+        """
+        Returns a dict:
+          out[eid] = {
+            'predictions': np.ndarray shape (n_frames, C),
+            'labels':      np.ndarray shape (n_frames, 1),
+            'scores':      np.ndarray shape (n_frames, C) if requested,
+            'embedding':   np.ndarray shape (n_frames, E),
+            'task_predictions': np.ndarray shape (n_frames, T) if any
+          }
+        """
+        # 1) set mode
+        if mode=='eval':  self.eval()
+        elif mode=='train': self.train()
+        else: raise ValueError("mode must be 'eval' or 'train'")
+    
+        pad = loader.pad
+        softmax = nn.Softmax(dim=-1)
+    
+        # prepare per-eid containers
+        out = {}
+        for eid in loader.eids:
+            out[eid] = {
+                'predictions':    [],
+                'labels':         [],
+                'scores':         [] if return_scores else None,
+                'embedding':      [],
+                'task_predictions': []
+            }
+    
+        loader.reset_iterators()
+        for _ in range(len(loader)):
+            data, _ = loader.next_batch()
+            feats, labels, fidx, start = data['markers'], data['labels_strong'], data['fidx'], data['start']
+            with torch.no_grad():
+                res = self.forward(feats)
+    
+            logits = res['labels']    # (B, Lp, C)
+            emb    = res['embedding'] # (B, Lp, E)
+    
+            if remove_pad and pad>0:
+                logits = logits[:, pad:-pad]
+                emb    = emb   [:, pad:-pad]
+                labels = labels[:, pad:-pad]    # (B, L, 1)
+    
+            preds = softmax(logits)   # (B, L, C)
+    
+            B, L, C = preds.shape
+            for b in range(B):
+                eid = loader.eids[int(fidx[b].item())]
+    
+                # flatten to (L,) for labels:
+                lbl_arr = labels[b].view(-1).cpu().numpy()
+                out[eid]['labels'].append(lbl_arr)
+    
+                # predictions and scores as before, but flattened across time:
+                out[eid]['predictions'].append(preds[b].reshape(-1, C).cpu().numpy())
+                if return_scores:
+                    out[eid]['scores'].append(logits[b].reshape(-1, C).cpu().numpy())
+                out[eid]['embedding'].append(emb[b].reshape(-1, emb.shape[-1]).cpu().numpy())
+                # if 'task_prediction' in res:
+                #     tp = res['task_prediction']
+                #     out[eid]['task_predictions'].append(tp[b].reshape(-1, tp.shape[-1]).cpu().numpy())
+    
+        # final concatenation
+        for eid, d in out.items():
+            d['labels'] = np.concatenate(d['labels'], axis=0)           # shape (n_frames,)
+            d['predictions'] = np.concatenate(d['predictions'], axis=0)
+            if return_scores:
+                d['scores'] = np.concatenate(d['scores'], axis=0)
+            d['embedding'] = np.concatenate(d['embedding'], axis=0)
+            # if d['task_predictions']:
+            #     d['task_predictions'] = np.concatenate(d['task_predictions'], axis=0)
+    
+        return out
+        
     def predict_labels(self, data_generator, return_scores=False, remove_pad=True, mode='eval'):
         """
 
@@ -657,7 +740,13 @@ class Segmenter(BaseModel):
         # collect loss vals
         loss_dict['loss'] = loss.item()
 
+        # log f1 for val data
+        labels_strong_reshape = torch.reshape(outputs_dict['labels'], (-1, outputs_dict['labels'].shape[-1]))
+        f1 = f1_score(labels_strong[labels_strong>0].detach().cpu().numpy(), labels_strong_reshape[labels_strong>0].detach().cpu().numpy().argmax(axis=1), average=None)
+        f1 = np.mean(f1)
+        loss_dict['f1'] = f1
         return loss_dict
+    
 
 
 class Ensembler(object):

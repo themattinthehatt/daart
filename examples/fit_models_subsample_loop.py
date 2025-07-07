@@ -1,3 +1,4 @@
+
 """Loop over multiple model types/sets of data."""
 
 import argparse
@@ -10,6 +11,7 @@ import yaml
 
 from daart_utils.paths import data_path, config_path, results_path
 
+
 # assumes `fit_models_loop.py` and `fit_models.py` are in the same directory
 grid_search_file = '/home/bsb2144/daart/examples/fit_models.py'
 
@@ -21,8 +23,9 @@ def run_main(args):
     elif args.dataset == 'fly' or args.dataset == 'fly-4' or args.dataset == 'fly-5':
         from daart_utils.session_ids.fly import SESS_IDS_TRAIN_5 as sess_ids_list
     elif args.dataset == 'ibl':
-        from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_28 as sess_ids_list
-        #from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_5 as sess_ids_list
+        #from daart_utils.session_ids.ibl import SESS_IDS_TEST_2b as sess_ids_list
+        #from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_24 as sess_ids_list
+        from daart_utils.session_ids.ibl import SESS_IDS_TRAIN_OVERLAP_18 as sess_ids_list
     elif args.dataset == 'mouse-oft-aligned' \
             or args.dataset == 'mouse-oft-aligned-new' \
             or args.dataset == 'mouse-oft':
@@ -30,7 +33,7 @@ def run_main(args):
     elif args.dataset == 'resident-intruder':
         from daart_utils.session_ids.resident_intruder import SESS_IDS_TRAIN_6 as sess_ids_list
     elif args.dataset == 'calms21':
-        from daart_utils.session_ids.calms21 import SESS_IDS_TRAIN_10 as sess_ids_list
+        from daart_utils.session_ids.calms21 import SESS_IDS_TRAIN_68 as sess_ids_list
     else:
         raise NotImplementedError('"%s" is an invalid dataset' % args.dataset)
 
@@ -61,11 +64,20 @@ def run_main(args):
     
     if args.fit_tcn:
         model_types.append('dtcn')
+    if args.fit_tmlp:
+        model_types.append('tmlp')
     if args.fit_rsldsm:
         model_types.append('rsldsm')
     if args.fit_gmdgm:
         model_types.append('gmdgm')
 
+    config_model = yaml.safe_load(open(config_files['model']))
+    n_hid_units = config_model['n_hid_units']
+    n_lags = config_model['n_lags']
+    
+    # if n_hid_units in [128, 256, 512, 1028] or n_lags in [32]:
+    #     print('skip for now')
+    #     return
     sess_ids = sess_ids_list[0]
     pre = args.pre
     fracs = args.fracs.split(';')
@@ -86,6 +98,7 @@ def run_main(args):
         input_type = config_data['input_type']
 
         for frac in fracs:
+            print('frac', frac)
 
             # find sessions in which to keep hand labels
             # if args.dataset == 'mouse-oft-aligned' or args.dataset == 'mouse-oft':
@@ -109,9 +122,11 @@ def run_main(args):
             else:
                 # get total number of sessions from "frac"
                 n_sessions = int(float(frac) * len(sess_ids))
+                #print('sess_ids', sess_ids)
+                print('n_sessions', n_sessions)
                 # list out all possible combinations of n_sessions from sess_ids
                 sess_to_keep_list = list(itertools.combinations(sess_ids, n_sessions))
-                # print(sess_to_keep_list)
+                #print('stk', sess_to_keep_list)
 
             if len(sess_to_keep_list) == 0:
                 print('warning! a provided fraction resulted in zero sessions to keep')
@@ -130,8 +145,8 @@ def run_main(args):
 
                 sess_to_keep = sess_to_keep_list[s]
 
-                # print(sess_ids)
-                # print(list(sess_to_keep))
+                print(sess_ids)
+                print(list(sess_to_keep))
                 # modify configs
                 update_config(
                     config_files['model'], 'backbone', 'dtcn')
@@ -151,6 +166,16 @@ def run_main(args):
                 if model_type == 'dtcn':
                     update_config(
                     config_files['model'], 'model_class', 'segmenter')
+                    update_config(
+                    config_files['model'], 'n_hid_layers', 2)
+                    
+                elif model_type == 'temporal-mlp':
+                    update_config(
+                    config_files['model'], 'model_class', 'segmenter')
+                    update_config(
+                    config_files['model'], 'backbone', 'temporal-mlp')
+                    update_config(
+                    config_files['model'], 'n_hid_layers', 0)
                     
                 elif model_type == "rsldsm":
                     update_config(
@@ -263,6 +288,7 @@ if __name__ == '__main__':
     parser.add_argument('--fit_xgb', action='store_true', default=False)
     
     parser.add_argument('--fit_tcn', action='store_true', default=False)
+    parser.add_argument('--fit_tmlp', action='store_true', default=False)
     parser.add_argument('--fit_rsldsm', action='store_true', default=False)
     parser.add_argument('--fit_gmdgm', action='store_true', default=False)
     

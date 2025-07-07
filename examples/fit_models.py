@@ -101,6 +101,8 @@ def train_model(hparams):
     # pull class weights out of labeled training data
     if hparams.get('weight_classes', True):
         totals = data_gen.count_class_examples()
+        print('totals', totals)
+        
         idx_background = hparams.get('ignore_class', 0)
         if idx_background in np.arange(len(totals)):
             totals[idx_background] = 0  # get rid of background class
@@ -113,6 +115,10 @@ def train_model(hparams):
         print('class weights: {}'.format(class_weights))
     else:
         hparams['class_weights'] = None
+        
+    # manually override input size
+    if 'velocity' in hparams['batch_transforms']:
+        hparams['input_size'] = hparams['input_size']*2
 
     # -------------------------------------
     # build model
@@ -121,6 +127,10 @@ def train_model(hparams):
     if hparams['model_class'].lower() == 'segmenter':
         from daart.models import Segmenter
         model = Segmenter(hparams)
+    elif hparams['model_class'].lower() == 'tmlp':
+        from daart.models import TemporalMLP
+        print('TMLP model')
+        model = TemporalMLP(hparams)
     else:
         raise NotImplementedError
     model.to(hparams['device'])
@@ -140,6 +150,10 @@ def train_model(hparams):
     # export artifacts
     # -------------------------------------
 
+   # -------------------------------------
+    # export artifacts
+    # -------------------------------------
+
     # save training curves
     if hparams.get('plot_train_curves', False):
         plot_training_curves(
@@ -149,6 +163,7 @@ def train_model(hparams):
             save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
             format='png',
         )
+        
         # plot_training_curves(
         #     metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
         #     dtype='val',
@@ -156,22 +171,32 @@ def train_model(hparams):
         #     save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
         #     format='png',
         # )
+        
+       
+        # plot_train_val_curves(
+        #     metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
+        #     expt_ids=hparams['expt_ids'],
+        #     save_file=os.path.join(hparams['tt_version_dir'], 'train_val_curves'),
+        #     format='png',
+        # )
 
     # run model inference on all training sessions
+    print('inf now')
     if hparams['train_frac'] != 1.0:  # rebuild data generator to include all data if necessary
         hparams['train_frac'] = 1.0
-        data_gen = build_data_generator(hparams)
-    results_dict = model.predict_labels(data_gen)
-    for sess, dataset in enumerate(data_gen.datasets):
-        expt_id = dataset.id
-        labels = np.vstack(results_dict['labels'][sess])
-        np.save(os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy'), labels)
         
     # run model inference on all test sessions
+    if (type(hparams['batch_transforms'])==list) and ('velocity' in hparams['batch_transforms']):
+        hparams['batch_transforms'] = ['velocity']
+    else:
+        hparams['batch_transforms'] = []
+    print('building test')
     data_gen = build_data_generator(hparams, dtype='test')
+    print('getting preds')
     results_dict = model.predict_labels(data_gen)
     for sess, dataset in enumerate(data_gen.datasets):
         expt_id = dataset.id
+        print('saving', expt_id)
         labels = np.vstack(results_dict['labels'][sess])
         np.save(os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy'), labels)
 

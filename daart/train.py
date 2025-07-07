@@ -104,7 +104,8 @@ class Logger(object):
         metrics = {**loss_dict, 'batches': batches}  # append `batches` to loss_dict
 
         for key, val in metrics.items():
-
+            if key == 'f1' and np.isnan(val):
+                continue
             # define metric for the first time if necessary
             if key not in self.metrics[dtype]:
                 self.metrics[dtype][key] = 0
@@ -343,10 +344,6 @@ class Trainer(object):
         # -----------------------------------
         # train loop
         # -----------------------------------
-        
-        # start time
-        start_time = time.time()
-
         for i_epoch in tqdm(range(self.max_epochs + 1)):
             # Note: the 0th epoch has no training (randomly initialized model is evaluated) so we
             # cycle through `max_epochs` training epochs
@@ -376,7 +373,7 @@ class Trainer(object):
                 optimizer.zero_grad()
 
                 # get next minibatch and put it on the device
-                data, datasets = data_generator.next_batch('train',transforms=self.batch_transforms)
+                data, datasets = data_generator.next_batch('train')
 
                 # call the appropriate loss function
                 loss_dict = model.training_step(data, accumulate_grad=True)
@@ -408,22 +405,22 @@ class Trainer(object):
                         )
 
                     # save best val model
-                    # if logger.get_loss('val') < best_val_loss:
-                    #     best_val_loss = logger.get_loss('val')
-                    #     model.save(os.path.join(save_path, 'best_val_model.pt'))
-                    #     best_model_saved = True
-                    #     best_val_epoch = i_epoch
+                    if logger.get_loss('val') < best_val_loss:
+                        best_val_loss = logger.get_loss('val')
+                        model.save(os.path.join(save_path, 'best_val_model.pt'))
+                        best_model_saved = True
+                        best_val_epoch = i_epoch
 
-                    # # export aggregated metrics on val data
-                    # logger.create_metric_row(
-                    #     dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
-                    #     by_dataset=False, best_epoch=best_val_epoch)
-                    # # export individual dataset metrics on val data if possible
-                    # if data_generator.n_datasets > 1:
-                    #     for dataset in range(data_generator.n_datasets):
-                    #         logger.create_metric_row(
-                    #             dtype='val', epoch=i_epoch, batch=i_batch, dataset=dataset,
-                    #             trial=-1, by_dataset=True, best_epoch=best_val_epoch)
+                    # export aggregated metrics on val data
+                    logger.create_metric_row(
+                        dtype='val', epoch=i_epoch, batch=i_batch, dataset=-1, trial=-1,
+                        by_dataset=False, best_epoch=best_val_epoch)
+                    # export individual dataset metrics on val data if possible
+                    if data_generator.n_datasets > 1:
+                        for dataset in range(data_generator.n_datasets):
+                            logger.create_metric_row(
+                                dtype='val', epoch=i_epoch, batch=i_batch, dataset=dataset,
+                                trial=-1, by_dataset=True, best_epoch=best_val_epoch)
 
             # ---------------------------------------
             # export training metrics at end of epoch
@@ -449,19 +446,6 @@ class Trainer(object):
             if self.should_halt:
                 # break out of training loop; trainer.should_halt is modified by callbacks
                 break
-                
-                
-        # log time
-        # End time
-        end_time = time.time()
-
-        # Calculate the time taken
-        elapsed_time = end_time - start_time
-        logging.info(f"The for loop took {elapsed_time:.6f} seconds to complete.")
-
-        print(f"The for loop took {elapsed_time:.6f} seconds to complete.")
-        
-        
 
         # ---------------------------------------
         # wrap up with final save/eval
