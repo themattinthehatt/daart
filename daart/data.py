@@ -260,9 +260,11 @@ class SingleDataset(data.Dataset):
 
         # specify data
         self.id = id
-        self.video_dir = video_dir
-        self.inference = inference
-        self.expt_ids=expt_ids
+
+        # set batch transform params
+        self.batch_transform_params = batch_transform_params
+        self.batch_transforms = batch_transforms
+
         # get data paths
         self.signals = signals
         self.transforms = OrderedDict()
@@ -450,6 +452,15 @@ class SingleDataset(data.Dataset):
                 self.input_size = data_curr.shape[1]
                 self.feature_names = feature_names
                 self.dtypes[signal] = 'float32'
+                
+                # comput vel for markers and save mean/sd
+                if 'velocity' in self.batch_transforms:
+                    #print('data_curr', data_curr.shape, data_curr[5:])
+                    velocity = np.vstack([np.array(np.zeros_like(data_curr[0])), np.diff(data_curr, axis=0)])
+                    self.v_mean = np.mean(velocity, axis=0)
+                    self.v_std = np.std(velocity, axis=0)
+                    self.input_size *= 2
+
 
             elif signal == 'tasks':
 

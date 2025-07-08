@@ -331,11 +331,14 @@ class Trainer(object):
         best_val_loss = np.inf
         best_val_epoch = None
         n_train_batches = data_generator.n_tot_batches['train']
-        self.val_check_batch = np.append(
-            self.val_check_interval * n_train_batches *
-            np.arange(1, int((self.max_epochs + 1) / self.val_check_interval)),
-            [n_train_batches * self.max_epochs,
-             n_train_batches * (self.max_epochs + 1)]).astype('int')
+        n_val_batches = data_generator.n_tot_batches['val']
+
+        if n_val_batches > 0:
+            self.val_check_batch = np.append(
+                self.val_check_interval * n_train_batches *
+                np.arange(1, int((self.max_epochs + 1) / self.val_check_interval)),
+                [n_train_batches * self.max_epochs,
+                 n_train_batches * (self.max_epochs + 1)]).astype('int')
 
         # set random seeds for training
         torch.manual_seed(self.rng_seed_train)
