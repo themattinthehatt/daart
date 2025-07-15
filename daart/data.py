@@ -12,19 +12,21 @@ of trials, which are split into training, validation, and testing trials using t
 
 """
 
-from collections import OrderedDict
 import logging
-import numpy as np
 import os
-import pandas as pd
 import pickle
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Union
+
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
-from typing import List, Union
 from typeguard import typechecked
-from concurrent.futures import ThreadPoolExecutor
 
+from daart.transforms import gaussian_noise, rotate, shift, shot_noise
 
 __all__ = [
     'split_trials',
@@ -321,9 +323,6 @@ class SingleDataset(data.Dataset):
             data sample
 
         """
-        labels_seq = self.data['labels_strong'][idx]
-        #if (not self.inference) and (labels_seq.sum() == 0):
-         #   return False
         sample = OrderedDict()
         for signal in self.signals:
 
@@ -833,37 +832,7 @@ class DataGenerator(object):
             if self.device == 'cuda':
                 batch = {key: val.to('cuda') for key, val in batch.items()}
 
-        return batch, datasets   
-    
-def rotate(p, origin=(0, 0), degrees=0):
-    angle = np.deg2rad(degrees)
-    R = np.array([[np.cos(angle), -np.sin(angle)],
-                  [np.sin(angle),  np.cos(angle)]])
-    o = np.atleast_2d(origin)
-    p = np.atleast_2d(p)
-    return torch.tensor(np.squeeze((R @ (p.T-o.T) + o.T).T))
-
-def shift(p, u_min, u_max):
-    x_shift = np.random.uniform(u_min, u_max)
-    y_shift = np.random.uniform(u_min, u_max)
-    p[:,0] += x_shift
-    p[:,1] += y_shift
-    return p
-
-def gaussian_noise(p, sigma):
-    n = p.shape[0]
-    d = p.shape[1]
-    noise = np.random.normal(0, sigma, (n,d))
-    p += noise
-    return p
-
-def shot_noise(p, u_min, u_max):
-    ind = np.random.choice([0,1], p.shape, p=[0.99, .01])
-    noise = np.random.uniform(u_min, u_max, p.shape)
-    masked_noise = ind * noise
-    p += masked_noise
-    return p
-
+        return batch, datasets
 
 @typechecked
 def load_marker_csv(filepath: str) -> tuple:
@@ -935,7 +904,7 @@ def load_feature_csv(filepath: str) -> tuple:
         - marker names (list): name for each column of `x` and `y` matrices
 
     """
-    df = pd.read_csv(filepath).head(100000)
+    df = pd.read_csv(filepath)
     # drop first column if it just contains frame indices
     unnamed_col = 'Unnamed: 0'
     if unnamed_col in list(df.columns):

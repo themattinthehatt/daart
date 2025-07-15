@@ -2,8 +2,10 @@
 
 import logging
 import os
+
 import torch
-from daart.data import compute_sequence_pad, DataGenerator
+
+from daart.data import DataGenerator, compute_sequence_pad
 from daart.transforms import ZScore
 
 # to ignore imports for sphix-autoapidoc
@@ -141,6 +143,7 @@ def collect_callbacks(hparams: dict) -> list:
     callbacks = []
     if hparams['enable_early_stop']:
         from daart.callbacks import EarlyStopping
+
         # Note that patience does not account for val check interval values greater than 1;
         # for example, if val_check_interval=5 and patience=20, then the model will train
         # for at least 5 * 20 = 100 epochs before training can terminate
@@ -162,7 +165,7 @@ def collect_callbacks(hparams: dict) -> list:
                 epoch_start=hparams['anneal_start'],
             ))
     elif hparams.get('semi_supervised_algo', 'none') == 'ups':
-        from daart.callbacks import AnnealHparam, UPS
+        from daart.callbacks import UPS, AnnealHparam
         if hparams['lambda_weak'] == 0:
             print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
         else:

@@ -2,15 +2,16 @@
 
 import copy
 import logging
-import numpy as np
 import os
 import sys
 import time
+
+import numpy as np
 import torch
 
 from daart.eval import plot_training_curves
 from daart.io import export_hparams
-from daart.testtube import get_all_params, print_hparams, create_tt_experiment, clean_tt_dir
+from daart.testtube import clean_tt_dir, create_tt_experiment, get_all_params, print_hparams
 from daart.train import Trainer
 from daart.utils import build_data_generator, collect_callbacks
 
@@ -95,10 +96,6 @@ def train_model(hparams):
     if hparams['model_class'].lower() == 'segmenter':
         from daart.models import Segmenter
         model = Segmenter(hparams)
-    elif hparams['model_class'].lower() == 'tmlp':
-        from daart.models import TemporalMLP
-        print('TMLP model')
-        model = TemporalMLP(hparams)
     else:
         raise NotImplementedError
     model.to(hparams['device'])
@@ -134,14 +131,6 @@ def train_model(hparams):
                 dtype='val',
                 expt_ids=hparams['expt_ids'],
                 save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
-                format='png',
-            )
-            
-           
-            plot_train_val_curves(
-                metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
-                expt_ids=hparams['expt_ids'],
-                save_file=os.path.join(hparams['tt_version_dir'], 'train_val_curves'),
                 format='png',
             )
 

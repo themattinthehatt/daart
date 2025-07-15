@@ -1,1 +1,1 @@
-from daart.models.base import Segmenter, Ensembler
+from daart.models.base import Ensembler, Segmenter

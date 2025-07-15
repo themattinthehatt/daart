@@ -1,6 +1,7 @@
 """Temporal Convolution model implemented in PyTorch."""
 
 from torch import nn
+
 from daart.models.base import BaseModel, get_activation_func_from_str
 
 # to ignore imports for sphix-autoapidoc

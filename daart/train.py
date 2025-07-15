@@ -1,14 +1,15 @@
 """Helper functions for model training."""
 
+import logging
 import os
+import time
+from typing import Optional, Union
+
 import numpy as np
 import pandas as pd
 import torch
 from tqdm import tqdm
-from typing import Optional, Union
 from typeguard import typechecked
-import time
-import logging
 
 from daart.io import make_dir_if_not_exists
 

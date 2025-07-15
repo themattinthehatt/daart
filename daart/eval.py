@@ -1,13 +1,14 @@
 """Evaluation functions for the daart package."""
 
 import itertools
+from typing import List, Optional, Union
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from sklearn.metrics import recall_score, precision_score
+from sklearn.metrics import precision_score, recall_score
 from typeguard import typechecked
-from typing import List, Optional, Union
 
 from daart.io import make_dir_if_not_exists
 
