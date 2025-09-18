@@ -1,4 +1,10 @@
-# daart: deep learning for animal action recognition toolbox
+# DEPRECATION WARNING
+
+This repo is no longer under active development, and will be archived starting in January 2026.
+
+For an up-to-date implementation of animal action segmentation algorithms see the [Lightning Action repo](https://github.com/paninski-lab/lightning-action/).
+
+### daart: deep learning for animal action recognition toolbox
 
 [![Documentation Status](https://readthedocs.org/projects/daart/badge/?version=latest)](https://daart.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/334987729.svg)](https://zenodo.org/badge/latestdoi/334987729)
