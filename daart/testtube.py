@@ -2,12 +2,12 @@
 
 import os
 import sys
-from test_tube import HyperOptArgumentParser
-import yaml
 
-from daart.io import export_expt_info_to_csv
-from daart.io import find_experiment
-from daart.io import get_expt_dir, get_model_dir, get_subdirs
+import yaml
+from test_tube import HyperOptArgumentParser
+
+from daart.io import (export_expt_info_to_csv, find_experiment, get_expt_dir,
+                      get_model_dir, get_subdirs)
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['get_all_params', 'print_hparams', 'create_tt_experiment', 'clean_tt_dir']
@@ -105,6 +105,7 @@ def create_tt_experiment(hparams):
 def clean_tt_dir(hparams):
     """Delete all (unnecessary) subdirectories in the model directory (created by test-tube)"""
     import shutil
+
     # get subdirs
     version_dir = hparams['tt_version_dir']
     subdirs = get_subdirs(version_dir)

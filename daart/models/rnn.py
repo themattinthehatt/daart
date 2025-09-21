@@ -1,6 +1,7 @@
 """RNN models (LSTM/GRU) implemented in PyTorch."""
 
 from torch import nn
+
 from daart.models.base import BaseModel
 
 # to ignore imports for sphix-autoapidoc

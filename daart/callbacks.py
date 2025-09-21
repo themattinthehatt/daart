@@ -1,6 +1,7 @@
 """Callback classes to control training."""
 
 import logging
+
 import numpy as np
 
 # to ignore imports for sphix-autoapidoc
@@ -48,6 +49,7 @@ class EarlyStopping(BaseCallback):
 
         # skip if this is not a validation epoch
         if ~np.any(trainer.curr_batch == trainer.val_check_batch):
+
             return
 
         # use overall validation loss for early stopping

@@ -1,14 +1,17 @@
 """Base models/modules in PyTorch."""
 
+import warnings
+
 import numpy as np
+import torch
 from scipy.special import softmax as scipy_softmax
 from scipy.stats import entropy
-import torch
-from sklearn.metrics import accuracy_score, r2_score
+from sklearn.metrics import accuracy_score, f1_score, r2_score
 from torch import nn, save
 
 from daart import losses
 
+warnings.filterwarnings("ignore")
 # to ignore imports for sphix-autoapidoc
 __all__ = [
     'reparameterize_gaussian',
@@ -401,7 +404,7 @@ class Segmenter(BaseModel):
             'latent_logvar': logvar,  # (n_sequences, sequence_length, embedding_dim)
             'sample': z,  # (n_sequences, sequence_length, embedding_dim)
         }
-
+        
     def predict_labels(self, data_generator, return_scores=False, remove_pad=True, mode='eval'):
         """
 
@@ -602,6 +605,8 @@ class Segmenter(BaseModel):
             labels_strong_reshape = torch.reshape(
                 outputs_dict['labels'], (-1, outputs_dict['labels'].shape[-1]))
             loss_strong = self.class_loss(labels_strong_reshape, labels_strong)
+            if torch.isnan(loss_strong).any():
+                loss_strong = torch.tensor([0]).to(self.hparams['device'])
             loss += lambda_strong * loss_strong
             loss_strong_val = loss_strong.item()
             # log
@@ -645,13 +650,19 @@ class Segmenter(BaseModel):
             loss_dict['kl_weight'] = kl_weight
             loss_dict['loss_kl'] = loss_kl.item()
 
-        if accumulate_grad:
+        if accumulate_grad and loss.item() != 0:
             loss.backward()
 
         # collect loss vals
         loss_dict['loss'] = loss.item()
 
+        # log f1 for val data
+        labels_strong_reshape = torch.reshape(outputs_dict['labels'], (-1, outputs_dict['labels'].shape[-1]))
+        f1 = f1_score(labels_strong[labels_strong!=self.ignore_index].detach().cpu().numpy(), labels_strong_reshape[labels_strong!=self.ignore_index].detach().cpu().numpy().argmax(axis=1), average=None)
+        f1 = np.mean(f1)
+        loss_dict['f1'] = f1
         return loss_dict
+    
 
 
 class Ensembler(object):

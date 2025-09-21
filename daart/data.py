@@ -12,18 +12,21 @@ of trials, which are split into training, validation, and testing trials using t
 
 """
 
-from collections import OrderedDict
 import logging
-import numpy as np
 import os
-import pandas as pd
 import pickle
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
+from typing import List, Union
+
+import numpy as np
+import pandas as pd
 import torch
 from torch.utils import data
 from torch.utils.data import SubsetRandomSampler
-from typing import List, Union
 from typeguard import typechecked
 
+from daart.transforms import gaussian_noise, rotate, shift, shot_noise
 
 __all__ = [
     'split_trials',
@@ -225,7 +228,9 @@ class SingleDataset(data.Dataset):
             as_numpy: bool = False,
             sequence_length: int = 500,
             sequence_pad: int = 0,
-            input_type: str = 'markers'
+            input_type: str = 'markers',
+            batch_transform_params = {},
+            batch_transforms = [],
     ) -> None:
         """
 
@@ -257,6 +262,10 @@ class SingleDataset(data.Dataset):
 
         # specify data
         self.id = id
+
+        # set batch transform params
+        self.batch_transform_params = batch_transform_params
+        self.batch_transforms = batch_transforms
 
         # get data paths
         self.signals = signals
@@ -300,7 +309,7 @@ class SingleDataset(data.Dataset):
         return self.n_sequences
 
     @typechecked
-    def __getitem__(self, idx: Union[int, np.int64, None]) -> dict:
+    def __getitem__(self, idx: Union[int, np.int64, None]) -> Union[dict, bool]:
         """Return batch of data.
 
         Parameters
@@ -314,7 +323,6 @@ class SingleDataset(data.Dataset):
             data sample
 
         """
-
         sample = OrderedDict()
         for signal in self.signals:
 
@@ -330,6 +338,67 @@ class SingleDataset(data.Dataset):
                     sample[signal] = torch.from_numpy(sample[signal][0]).float()
                 else:
                     sample[signal] = torch.from_numpy(sample[signal][0]).long()
+
+            if signal == 'markers':
+                # add data augment transforms
+                #########################
+                #### ADD TRANSFORMS HERE
+                #########################
+        
+                if self.batch_transforms:
+                    # transforms on x,y paw coords for ibl data
+                    # load transform hyper params
+                    params = self.batch_transform_params
+
+                    # do rotation transform
+                    if 'rotate' in self.batch_transforms:
+                        angle = params['angle']
+                        degrees = np.random.uniform(-1 * angle, angle)
+                        #print('angle', angle)
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = rotate(points, degrees=degrees)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+
+                    if 'shift' in self.batch_transforms:
+                        u_max = params['shift_max']
+                        u_min = -1 * u_max
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = shift(points, u_min, u_max)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+
+                    if 'gaussian_noise' in self.batch_transforms:
+                        sigma = params['sigma']
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:]
+                        points_rotated = gaussian_noise(points, sigma)
+                        temp[:,:] = points_rotated
+                        sample[signal] = temp
+
+                    if 'shot_noise' in self.batch_transforms:
+                        u_max = params['shot_max']
+                        u_min = -1 * u_max
+                        temp = sample[signal] # shape (1, seq_len, input_len)
+                        points = temp[:,:2]
+                        points_rotated = shot_noise(points, u_min, u_max)
+                        temp[:,:2] = points_rotated
+                        sample[signal] = temp
+                        
+                    # check if we add velocity
+                    if 'velocity' in self.batch_transforms:
+                        velocity = np.vstack([np.zeros_like(sample[signal][0]), np.diff(sample[signal], axis=0)])
+                        velocity = (velocity - self.v_mean) / self.v_std
+                        #print('pre shape', sample[signal].shape)
+                        sample[signal] = torch.tensor(np.hstack([sample[signal], velocity]), dtype=torch.float32)
+                        #print('post shape', sample[signal].shape)
+               
+
+                ########################
+                ### END TRANSFORMS
+                ########################
 
         # add batch index
         sample['batch_idx'] = idx
@@ -382,6 +451,15 @@ class SingleDataset(data.Dataset):
                 self.input_size = data_curr.shape[1]
                 self.feature_names = feature_names
                 self.dtypes[signal] = 'float32'
+                
+                # comput vel for markers and save mean/sd
+                if 'velocity' in self.batch_transforms:
+                    #print('data_curr', data_curr.shape, data_curr[5:])
+                    velocity = np.vstack([np.array(np.zeros_like(data_curr[0])), np.diff(data_curr, axis=0)])
+                    self.v_mean = np.mean(velocity, axis=0)
+                    self.v_std = np.std(velocity, axis=0)
+                    self.input_size *= 2
+
 
             elif signal == 'tasks':
 
@@ -492,7 +570,9 @@ class DataGenerator(object):
             num_workers: int = 0,
             pin_memory: bool = False,
             sequence_pad: int = 0,
-            input_type: str = 'markers'
+            input_type: str = 'markers',
+            batch_transform_params = {},
+            batch_transforms = [],
     ) -> None:
         """
 
@@ -539,7 +619,7 @@ class DataGenerator(object):
         self.batch_size = batch_size
         self.as_numpy = as_numpy
         self.device = device
-
+        self.batch_transform_params = batch_transform_params
         self.datasets = []
         self.signals = signals_list
         self.transforms = transforms_list
@@ -549,7 +629,9 @@ class DataGenerator(object):
             self.datasets.append(SingleDataset(
                 id=id, signals=signals, transforms=transforms, paths=paths, device=device,
                 as_numpy=self.as_numpy, sequence_length=sequence_length,
-                sequence_pad=sequence_pad, input_type=input_type))
+                sequence_pad=sequence_pad, input_type=input_type,
+                batch_transform_params = batch_transform_params, batch_transforms=batch_transforms,
+            ))
 
         # collect info about datasets
         self.n_datasets = len(self.datasets)
@@ -637,6 +719,8 @@ class DataGenerator(object):
     def __len__(self) -> int:
         return self.n_datasets
 
+    
+    
     @typechecked
     def count_class_examples(self) -> np.array:
 
@@ -674,8 +758,9 @@ class DataGenerator(object):
             else:
                 self.dataset_iters[i][dtype] = iter(self.dataset_loaders[i][dtype])
 
+                
     @typechecked
-    def next_batch(self, dtype: str) -> tuple:
+    def next_batch(self, dtype: str, transforms: Union[iter, None]=None) -> tuple:
         """Return next batch of data.
 
         The data generator iterates randomly through datasets and trials. Once a dataset runs out
@@ -710,6 +795,8 @@ class DataGenerator(object):
             # get sequence from this dataset
             try:
                 sequence = next(self.dataset_iters[dataset][dtype])
+                if not sequence:
+                    continue
                 # add sequence to batch
                 sequences.append(sequence)
                 datasets.append(dataset)
@@ -725,7 +812,8 @@ class DataGenerator(object):
                     break
                 else:
                     continue
-
+        if len(sequences) < 1:
+            return False,False
         batch = OrderedDict()
         if self.as_numpy:
             for i, signal in enumerate(sequences[0]):
@@ -745,7 +833,6 @@ class DataGenerator(object):
                 batch = {key: val.to('cuda') for key, val in batch.items()}
 
         return batch, datasets
-
 
 @typechecked
 def load_marker_csv(filepath: str) -> tuple:

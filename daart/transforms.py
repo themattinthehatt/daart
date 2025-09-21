@@ -5,7 +5,6 @@ Data generator objects can apply these transforms to data upon loading.
 
 import numpy as np
 
-
 __all__ = [
     'Compose',
     'Transform',
@@ -13,7 +12,11 @@ __all__ = [
     'MakeOneHot',
     'MotionEnergy',
     'Unitize',
-    'ZScore'
+    'ZScore',
+    'rotate',
+    'shift',
+    'gaussian_noise',
+    'shot_noise'
 ]
 
 
@@ -239,3 +242,33 @@ class ZScore(Transform):
 
     def __repr__(self):
         return 'ZScore()'
+
+
+def rotate(p, origin=(0, 0), degrees=0):
+    angle = np.deg2rad(degrees)
+    R = np.array([[np.cos(angle), -np.sin(angle)],
+                  [np.sin(angle),  np.cos(angle)]])
+    o = np.atleast_2d(origin)
+    p = np.atleast_2d(p)
+    return torch.tensor(np.squeeze((R @ (p.T-o.T) + o.T).T))
+
+def shift(p, u_min, u_max):
+    x_shift = np.random.uniform(u_min, u_max)
+    y_shift = np.random.uniform(u_min, u_max)
+    p[:,0] += x_shift
+    p[:,1] += y_shift
+    return p
+
+def gaussian_noise(p, sigma):
+    n = p.shape[0]
+    d = p.shape[1]
+    noise = np.random.normal(0, sigma, (n,d))
+    p += noise
+    return p
+
+def shot_noise(p, u_min, u_max):
+    ind = np.random.choice([0,1], p.shape, p=[0.99, .01])
+    noise = np.random.uniform(u_min, u_max, p.shape)
+    masked_noise = ind * noise
+    p += masked_noise
+    return p

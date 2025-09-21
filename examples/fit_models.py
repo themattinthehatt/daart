@@ -2,21 +2,21 @@
 
 import copy
 import logging
-import numpy as np
 import os
 import sys
 import time
+
+import numpy as np
 import torch
 
 from daart.eval import plot_training_curves
 from daart.io import export_hparams
-from daart.testtube import get_all_params, print_hparams, create_tt_experiment, clean_tt_dir
+from daart.testtube import clean_tt_dir, create_tt_experiment, get_all_params, print_hparams
 from daart.train import Trainer
 from daart.utils import build_data_generator, collect_callbacks
 
 
 def run_main(hparams, *args):
-
     # set return value
     ret_val = None
 
@@ -24,19 +24,21 @@ def run_main(hparams, *args):
 
         if not isinstance(hparams, dict):
             hparams = vars(hparams)
-
+    
+        #print('hp', hparams)
         # start at random times (so test tube creates separate folders)
         t = time.time()
         np.random.seed(int(100000000000 * t) % (2 ** 32 - 1))
         time.sleep(np.random.uniform(2))
-
+    
         # create test-tube experiment
         hparams['expt_ids'] = hparams['expt_ids'].split(';')
+        hparams['expt_ids_test'] = hparams['expt_ids_test'].split(';')
         hparams, exp = create_tt_experiment(hparams)
         if hparams is None:
             print('Experiment exists! Aborting fit')
             return
-
+    
         # set up error logging (different from train logging)
         logging.basicConfig(
             filename=os.path.join(hparams['tt_version_dir'], 'console.log'),
@@ -44,7 +46,7 @@ def run_main(hparams, *args):
             format='%(asctime)s %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
         )
         logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))  # add logging to console
-
+    
         # run train model script
         train_model(hparams)
 
@@ -71,6 +73,8 @@ def train_model(hparams):
     # pull class weights out of labeled training data
     if hparams.get('weight_classes', True):
         totals = data_gen.count_class_examples()
+        print('totals', totals)
+        
         idx_background = hparams.get('ignore_class', 0)
         if idx_background in np.arange(len(totals)):
             totals[idx_background] = 0  # get rid of background class
@@ -83,6 +87,7 @@ def train_model(hparams):
         print('class weights: {}'.format(class_weights))
     else:
         hparams['class_weights'] = None
+        
 
     # -------------------------------------
     # build model
@@ -102,7 +107,6 @@ def train_model(hparams):
     callbacks = collect_callbacks(hparams)
     trainer = Trainer(**hparams, callbacks=callbacks)
     trainer.fit(model, data_gen, save_path=hparams['tt_version_dir'])
-
     # update hparams upon successful training
     hparams['training_completed'] = True
     export_hparams(hparams)
@@ -120,21 +124,31 @@ def train_model(hparams):
             save_file=os.path.join(hparams['tt_version_dir'], 'train_curves'),
             format='png',
         )
-        plot_training_curves(
-            metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
-            dtype='val',
-            expt_ids=hparams['expt_ids'],
-            save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
-            format='png',
-        )
+        
+        if data_gen.n_tot_batches['val'] > 0:
+            plot_training_curves(
+                metrics_file=os.path.join(hparams['tt_version_dir'], 'metrics.csv'),
+                dtype='val',
+                expt_ids=hparams['expt_ids'],
+                save_file=os.path.join(hparams['tt_version_dir'], 'val_curves'),
+                format='png',
+            )
 
     # run model inference on all training sessions
     if hparams['train_frac'] != 1.0:  # rebuild data generator to include all data if necessary
         hparams['train_frac'] = 1.0
-        data_gen = build_data_generator(hparams)
-    results_dict = model.predict_labels(data_gen)
-    for sess, dataset in enumerate(data_gen.datasets):
+        
+    # run model inference on all test sessions
+    if (type(hparams['batch_transforms'])==list) and ('velocity' in hparams['batch_transforms']):
+        hparams['batch_transforms'] = ['velocity']
+    else:
+        hparams['batch_transforms'] = []
+
+    data_gen_test = build_data_generator(hparams, dtype='test')
+    results_dict = model.predict_labels(data_gen_test)
+    for sess, dataset in enumerate(data_gen_test.datasets):
         expt_id = dataset.id
+        print('saving', expt_id)
         labels = np.vstack(results_dict['labels'][sess])
         np.save(os.path.join(hparams['tt_version_dir'], f'{expt_id}_states.npy'), labels)
 

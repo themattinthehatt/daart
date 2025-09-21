@@ -3,22 +3,27 @@
 import logging
 import os
 
-from daart.data import compute_sequence_pad, DataGenerator
-from daart.transforms import ZScore
+import torch
 
+from daart.data import DataGenerator, compute_sequence_pad
+from daart.transforms import ZScore
 
 # to ignore imports for sphix-autoapidoc
 __all__ = ['build_data_generator', 'collect_callbacks']
 
 
-def build_data_generator(hparams: dict) -> DataGenerator:
+def build_data_generator(hparams: dict, dtype='train') -> DataGenerator:
     """Helper function to build a data generator from hparam dict."""
 
     signals = []
     transforms = []
     paths = []
-
-    for expt_id in hparams['expt_ids']:
+    if dtype == 'train':
+        expt_ids = hparams['expt_ids']
+    else:
+        expt_ids = hparams['expt_ids_test']
+        
+    for expt_id in expt_ids:
 
         signals_curr = []
         transforms_curr = []
@@ -50,7 +55,7 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
         # hand labels
         if hparams.get('lambda_strong', 0) > 0:
-            if expt_id not in hparams.get('expt_ids_to_keep', hparams['expt_ids']):
+            if expt_id not in hparams.get('expt_ids_to_keep',expt_ids) and dtype=='train':
                 hand_labels_file = None
             else:
                 base_dir = os.path.join(hparams['data_dir'], 'labels-hand')
@@ -101,10 +106,9 @@ def build_data_generator(hparams: dict) -> DataGenerator:
 
     # compute padding needed to account for convolutions
     hparams['sequence_pad'] = compute_sequence_pad(hparams)
-
     # build data generator
     data_gen = DataGenerator(
-        hparams['expt_ids'], signals, transforms, paths,
+        expt_ids, signals, transforms, paths,
         device=hparams['device'],
         sequence_length=hparams['sequence_length'],
         sequence_pad=hparams['sequence_pad'],
@@ -112,6 +116,8 @@ def build_data_generator(hparams: dict) -> DataGenerator:
         trial_splits=hparams['trial_splits'],
         train_frac=hparams['train_frac'],
         input_type=hparams.get('input_type', 'markers'),
+        batch_transform_params=hparams.get('batch_transform_params', {}),
+        batch_transforms=hparams.get('batch_transforms', []),
     )
 
     # automatically compute input/output sizes from data
@@ -137,6 +143,7 @@ def collect_callbacks(hparams: dict) -> list:
     callbacks = []
     if hparams['enable_early_stop']:
         from daart.callbacks import EarlyStopping
+
         # Note that patience does not account for val check interval values greater than 1;
         # for example, if val_check_interval=5 and patience=20, then the model will train
         # for at least 5 * 20 = 100 epochs before training can terminate
@@ -158,7 +165,7 @@ def collect_callbacks(hparams: dict) -> list:
                 epoch_start=hparams['anneal_start'],
             ))
     elif hparams.get('semi_supervised_algo', 'none') == 'ups':
-        from daart.callbacks import AnnealHparam, UPS
+        from daart.callbacks import UPS, AnnealHparam
         if hparams['lambda_weak'] == 0:
             print('warning! use lambda_weak in model.yaml to weight pseudo label loss')
         else:

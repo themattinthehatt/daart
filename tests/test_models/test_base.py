@@ -1,8 +1,9 @@
 import copy
+
 import numpy as np
 import torch
 
-from daart.models import Segmenter, Ensembler
+from daart.models import Ensembler, Segmenter
 
 
 def test_reparameterize_gaussian():

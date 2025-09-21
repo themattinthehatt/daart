@@ -1,10 +1,11 @@
 import copy
-import numpy as np
 import os
+
+import numpy as np
 import pytest
 import torch
 
-from daart.data import split_trials, compute_sequences, compute_sequence_pad, DataGenerator
+from daart.data import DataGenerator, compute_sequence_pad, compute_sequences, split_trials
 from daart.utils import build_data_generator
 
 
